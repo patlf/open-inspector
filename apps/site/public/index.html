@@ -22,8 +22,12 @@
   </head>
 
   <body>
-    <div class="wrap">
-      <header class="top">
+    <!--
+      Outside .wrap on purpose: a sticky bar has to span the viewport, or the
+      page scrolls past it in the side gutters.
+    -->
+    <header class="topbar">
+      <div class="wrap top">
         <a class="brand" href="/">
           <img src="/logo.svg" width="24" height="24" alt="" />
           Open Inspector
@@ -36,7 +40,10 @@
           <a href="#faq">FAQ</a>
           <a href="#install">Install</a>
         </nav>
-      </header>
+      </div>
+    </header>
+
+    <div class="wrap">
 
       <div class="hero">
         <div class="hero-text">
@@ -49,7 +56,7 @@
         </p>
 
         <div class="actions">
-          <a class="btn" href="https://chromewebstore.google.com/detail/open-inspector/apiiaenebelbejcjpmbcecikmaahpffd">Add to Chrome</a>
+          <a class="btn" href="https://chromewebstore.google.com/detail/open-inspector/apiiaenebelbejcjpmbcecikmaahpffd"><svg class="btn-mark" width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.47 6.5A11 11 0 0 1 21.53 6.5L12 12Z" fill="#ea4335"/><path d="M21.53 6.5A11 11 0 0 1 12 23L12 12Z" fill="#fbbc05"/><path d="M12 23A11 11 0 0 1 2.47 6.5L12 12Z" fill="#34a853"/><circle cx="12" cy="12" r="5.6" fill="#fff"/><circle cx="12" cy="12" r="4.4" fill="#4285f4"/></svg><span>Add to Chrome</span></a>
           <a class="btn ghost" href="#verify">See how to verify</a>
           <span class="note">Free · MIT · no account</span>
         </div>
@@ -64,7 +71,7 @@
           <!-- The panel has a dark theme; show the one the reader is actually in. -->
           <picture>
             <source srcset="/shots/panel-styles-dark.png" media="(prefers-color-scheme: dark)" />
-            <img src="/shots/panel-styles.png" width="348" height="470" alt="" />
+            <img src="/shots/panel-styles.png" width="408" height="488" alt="" />
           </picture>
         </figure>
       </div>
@@ -170,7 +177,7 @@
             <figure class="walk-visual">
               <picture>
                 <source srcset="/shots/panel-styles-dark.png" media="(prefers-color-scheme: dark)" />
-                <img src="/shots/panel-styles.png" width="348" height="470" loading="lazy"
+                <img src="/shots/panel-styles.png" width="408" height="488" loading="lazy"
                      alt="The Styles panel." />
               </picture>
             </figure>
@@ -188,7 +195,7 @@
             <figure class="walk-visual">
               <picture>
                 <source srcset="/shots/panel-color-dark.png" media="(prefers-color-scheme: dark)" />
-                <img src="/shots/panel-color.png" width="348" height="470" loading="lazy"
+                <img src="/shots/panel-color.png" width="408" height="488" loading="lazy"
                      alt="The Color panel." />
               </picture>
             </figure>
@@ -206,7 +213,7 @@
             <figure class="walk-visual">
               <picture>
                 <source srcset="/shots/panel-type-dark.png" media="(prefers-color-scheme: dark)" />
-                <img src="/shots/panel-type.png" width="348" height="470" loading="lazy"
+                <img src="/shots/panel-type.png" width="408" height="488" loading="lazy"
                      alt="The Type panel." />
               </picture>
             </figure>
@@ -224,7 +231,7 @@
             <figure class="walk-visual">
               <picture>
                 <source srcset="/shots/panel-layout-dark.png" media="(prefers-color-scheme: dark)" />
-                <img src="/shots/panel-layout.png" width="348" height="470" loading="lazy"
+                <img src="/shots/panel-layout.png" width="408" height="488" loading="lazy"
                      alt="The Layout panel." />
               </picture>
             </figure>
@@ -242,7 +249,7 @@
             <figure class="walk-visual">
               <picture>
                 <source srcset="/shots/panel-assets-dark.png" media="(prefers-color-scheme: dark)" />
-                <img src="/shots/panel-assets.png" width="348" height="470" loading="lazy"
+                <img src="/shots/panel-assets.png" width="408" height="488" loading="lazy"
                      alt="The Assets panel." />
               </picture>
             </figure>
@@ -260,7 +267,7 @@
             <figure class="walk-visual">
               <picture>
                 <source srcset="/shots/panel-markup-dark.png" media="(prefers-color-scheme: dark)" />
-                <img src="/shots/panel-markup.png" width="348" height="470" loading="lazy"
+                <img src="/shots/panel-markup.png" width="408" height="488" loading="lazy"
                      alt="The Markup panel." />
               </picture>
             </figure>
@@ -278,7 +285,7 @@
             <figure class="walk-visual">
               <picture>
                 <source srcset="/shots/panel-export-dark.png" media="(prefers-color-scheme: dark)" />
-                <img src="/shots/panel-export.png" width="348" height="470" loading="lazy"
+                <img src="/shots/panel-export.png" width="408" height="488" loading="lazy"
                      alt="The Export panel." />
               </picture>
             </figure>
@@ -652,7 +659,7 @@
             <span class="install-state">Available now</span>
             <h3>Chrome, Edge, Brave</h3>
             <p>Any Chromium browser. One click, and it asks for no site access.</p>
-            <a class="btn" href="https://chromewebstore.google.com/detail/open-inspector/apiiaenebelbejcjpmbcecikmaahpffd">Add to Chrome</a>
+            <a class="btn" href="https://chromewebstore.google.com/detail/open-inspector/apiiaenebelbejcjpmbcecikmaahpffd"><svg class="btn-mark" width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.47 6.5A11 11 0 0 1 21.53 6.5L12 12Z" fill="#ea4335"/><path d="M21.53 6.5A11 11 0 0 1 12 23L12 12Z" fill="#fbbc05"/><path d="M12 23A11 11 0 0 1 2.47 6.5L12 12Z" fill="#34a853"/><circle cx="12" cy="12" r="5.6" fill="#fff"/><circle cx="12" cy="12" r="4.4" fill="#4285f4"/></svg><span>Add to Chrome</span></a>
           </div>
 
           <div class="install">
@@ -685,7 +692,7 @@ pnpm build</code></pre>
             cannot write. Everything else here is a consequence of it.
           </p>
           <div class="actions">
-            <a class="btn" href="https://chromewebstore.google.com/detail/open-inspector/apiiaenebelbejcjpmbcecikmaahpffd">Add to Chrome</a>
+            <a class="btn" href="https://chromewebstore.google.com/detail/open-inspector/apiiaenebelbejcjpmbcecikmaahpffd"><svg class="btn-mark" width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.47 6.5A11 11 0 0 1 21.53 6.5L12 12Z" fill="#ea4335"/><path d="M21.53 6.5A11 11 0 0 1 12 23L12 12Z" fill="#fbbc05"/><path d="M12 23A11 11 0 0 1 2.47 6.5L12 12Z" fill="#34a853"/><circle cx="12" cy="12" r="5.6" fill="#fff"/><circle cx="12" cy="12" r="4.4" fill="#4285f4"/></svg><span>Add to Chrome</span></a>
             <a class="btn ghost" href="#verify">See how to verify</a>
           </div>
         </div>
@@ -734,6 +741,23 @@ pnpm build</code></pre>
         );
 
         document.querySelectorAll('.walk-block').forEach(function (b) { observer.observe(b); });
+      })();
+
+      /*
+       * Give the sticky bar an edge once the page has scrolled under it.
+       *
+       * At the top of the page the bar and the hero share a background and a
+       * rule between them would be drawing a line across nothing.
+       */
+      (function () {
+        var bar = document.querySelector('.topbar');
+        if (!bar) return;
+
+        var mark = function () {
+          bar.dataset.scrolled = window.scrollY > 8 ? 'true' : 'false';
+        };
+        mark();
+        window.addEventListener('scroll', mark, { passive: true });
       })();
     </script>
   </body>

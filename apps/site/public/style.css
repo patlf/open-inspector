@@ -51,6 +51,9 @@
   --s6: 64px;
   --s7: 96px;
 
+  /* Measured from the bar's own padding and content; anchors offset by it. */
+  --topbar-h: 75px;
+
   color-scheme: light;
 }
 
@@ -79,6 +82,14 @@
 }
 
 * { box-sizing: border-box; }
+
+/*
+ * Anchor targets clear the sticky bar.
+ *
+ * Without this every in-page link lands with its heading tucked underneath the
+ * header, which reads as the link having missed.
+ */
+html { scroll-padding-top: calc(var(--topbar-h) + var(--s3)); }
 
 body {
   margin: 0;
@@ -145,14 +156,60 @@ code {
 
 /* ---------- masthead ---------- */
 
+/*
+ * Translucent rather than solid.
+ *
+ * The page has real content running under it, and a flat opaque strip makes
+ * the bar look pasted on. A blurred backdrop keeps the sense that the page
+ * continues underneath, and the hairline gives it an edge to sit on.
+ */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid transparent;
+  transition: border-color 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* The rule appears only once there is something scrolled underneath it. */
+.topbar[data-scrolled='true'] { border-bottom-color: var(--rule); }
+
+/* A browser without backdrop-filter gets an opaque bar rather than a smear. */
+@supports not (backdrop-filter: blur(1px)) {
+  .topbar { background: var(--bg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .topbar { transition: none; }
+}
+
+/*
+ * Not sticky on a phone.
+ *
+ * The nav wraps to a second line below 640px, which makes the bar 136px tall.
+ * Pinning that costs a fifth of the screen on every scroll, permanently, to
+ * keep six links visible — a bad trade on the device with the least room. It
+ * scrolls away instead, and the anchor offset goes with it.
+ */
+@media (max-width: 640px) {
+  .topbar { position: static; }
+  html { scroll-padding-top: var(--s3); }
+}
+
 .top {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--s2);
-  padding: var(--s3) 0;
+  padding: var(--s3) var(--s4);
   flex-wrap: wrap;
 }
+
+@media (min-width: 1200px) { .top { padding: var(--s3) var(--s5); } }
+@media (min-width: 1680px) { .top { padding: var(--s3) var(--s6); } }
 
 .brand {
   display: flex;
@@ -202,10 +259,9 @@ code {
 .hero-shot img {
   display: block;
   /*
-   * Source is 696px wide at 2x, so anything up to about 460 CSS px still
-   * renders above 1.5x. Past that it would start to soften.
+   * Source is 1224px wide at 3x, so this stays above 2x out to about 600 CSS px.
    */
-  width: min(100%, 420px);
+  width: min(100%, 480px);
   /*
    * Load-bearing.
    *
@@ -217,8 +273,9 @@ code {
    */
   height: auto;
   border: 1px solid var(--rule);
-  border-radius: 8px;
-  box-shadow: var(--shadow);
+  /* Square at the bottom, where the panel runs off the image rather than ending. */
+  border-radius: 10px 10px 0 0;
+  border-bottom: 0;
 }
 
 /* Below this the panel would be a smudge above the copy that matters. */
@@ -260,9 +317,12 @@ h1 em { font-style: normal; color: var(--accent); }
 .actions { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; }
 
 .btn {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
   font-family: var(--mono);
   font-size: var(--t-1);
+  font-weight: 600;
   letter-spacing: 0.02em;
   padding: 11px 20px;
   border-radius: 5px;
@@ -271,6 +331,9 @@ h1 em { font-style: normal; color: var(--accent); }
   color: #fff;
   text-decoration: none;
 }
+
+/* The Chrome mark is full colour, so it never inherits the button's ink. */
+.btn-mark { display: block; flex: none; }
 @media (prefers-color-scheme: dark) { .btn { color: #14181c; } }
 .btn:hover { filter: brightness(1.08); }
 
@@ -367,8 +430,9 @@ h2 {
   width: 100%;
   height: auto;
   border: 1px solid var(--rule);
-  border-radius: 8px;
-  box-shadow: var(--shadow);
+  /* Square at the bottom, where the panel runs off the image rather than ending. */
+  border-radius: 10px 10px 0 0;
+  border-bottom: 0;
 }
 
 /* ---------- panel list ---------- */
@@ -642,7 +706,15 @@ kbd {
   color: var(--ink);
 }
 .compare thead th:first-child { text-align: left; padding-left: var(--s3); width: 38%; }
-.compare thead th[data-ours='true'] { color: var(--accent); background: var(--accent-wash); }
+/*
+ * Green, not accent.
+ *
+ * Orange is this page's "you changed something" colour and it was doing a
+ * second job here it was never meant to do. The column is a verdict, and the
+ * two permission cards above already taught the reader that green means "this
+ * is the good answer".
+ */
+.compare thead th[data-ours='true'] { color: var(--good-ink); background: var(--good-wash); }
 
 .compare tbody th {
   text-align: left;
@@ -661,7 +733,7 @@ kbd {
   font-family: var(--mono);
   font-size: 0.8rem;
 }
-.compare tbody td[data-ours='true'] { background: var(--accent-wash); color: var(--ink); }
+.compare tbody td[data-ours='true'] { background: var(--good-wash); color: var(--ink); }
 .compare tbody tr:last-child th, .compare tbody tr:last-child td { border-bottom: 0; }
 
 .yes { color: var(--good-ink); font-weight: 600; }
@@ -981,7 +1053,7 @@ pre {
 
 .walk-rail {
   position: sticky;
-  top: var(--s4);
+  top: calc(var(--topbar-h) + var(--s3));
   align-self: start;
   height: fit-content;
 }
@@ -1017,7 +1089,7 @@ pre {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
   gap: var(--s4);
-  scroll-margin-top: var(--s5);
+  scroll-margin-top: calc(var(--topbar-h) + var(--s4));
   align-items: start;
 }
 
@@ -1084,16 +1156,22 @@ pre {
  * thing would either be enormous or shrink the type past reading. Cropping it
  * at the frame says there is more panel below, which there is.
  */
+/*
+ * A clipping frame, and nothing else.
+ *
+ * The backdrop, the inset and the panel's shadow are all baked into the image
+ * now (see scripts/frame-site-shots.mjs), which is the only way to get one
+ * surface instead of two: a tinted tile *and* a tinted image inside it read as a
+ * rectangle sitting on a rectangle, and no amount of matching the two colours
+ * hides the seam at the edges. So the tile keeps the geometry — the square, the
+ * radius, the crop — and gives up the paint.
+ */
 .walk-visual {
   margin: 0;
   aspect-ratio: 1;
   border: 1px solid var(--rule);
   border-radius: 16px;
-  background: var(--raised);
-  padding: var(--s3);
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
+  padding: 0;
   overflow: hidden;
 }
 
@@ -1105,15 +1183,26 @@ pre {
  * least distinctive middle. The bleed belongs at the bottom, where the panel
  * genuinely continues.
  */
+/*
+ * The <picture> has to be sized, not just the <img> inside it.
+ *
+ * `justify-content: center` centres the flex item, and the flex item is the
+ * picture, not the image. Left to itself the picture stretches to fill the tile:
+ * working out its intrinsic width means resolving the image's `min(100%, 420px)`
+ * with the percentage treated as auto, which leaves the image's *natural* width
+ * — over a thousand pixels — as the max-content contribution. So the picture
+ * took the whole tile and the image sat at its left edge, with the entire
+ * remainder as empty space on the right. Only visible below 940px, where the
+ * tile is wider than the image; above it the two are the same width and the bug
+ * has nowhere to show.
+ */
+.walk-visual picture { display: block; }
+
+/* Edge to edge: the image is the surface, so any gap would show the page through. */
 .walk-visual img {
   display: block;
-  width: min(100%, 420px);
+  width: 100%;
   height: auto;
-  height: auto;
-  border: 1px solid var(--rule);
-  border-radius: 10px 10px 0 0;
-  border-bottom: 0;
-  box-shadow: 0 14px 40px -24px rgba(0, 0, 0, 0.45);
 }
 
 @media (max-width: 940px) {
@@ -1121,7 +1210,14 @@ pre {
   .walk-rail { display: none; }
   .walk-stack { gap: var(--s6); }
   .walk-block { grid-template-columns: 1fr; gap: var(--s3); }
-  .walk-visual { aspect-ratio: 4 / 3; }
+  /*
+   * Capped, because the tile no longer has a paint of its own to stretch.
+   *
+   * One column means the tile would otherwise run the full width of the page,
+   * and the image cannot follow it: 1224px of capture stops being a 2x image
+   * somewhere around 600 CSS px, and past that the panel goes soft again.
+   */
+  .walk-visual { aspect-ratio: 4 / 3; max-width: 520px; margin-inline: auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {
