@@ -1,0 +1,740 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Open Inspector — inspect any page, with no site access</title>
+    <meta
+      name="description"
+      content="A free, open-source browser extension that inspects layout, styles, colour, type and assets on any page — and requests no access to your data. No host permissions, no network requests, no account."
+    />
+    <link rel="icon" href="/favicon.svg?v=2" type="image/svg+xml" />
+    <link rel="alternate icon" href="/favicon-32.png?v=2" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/icon-128.png?v=2" />
+    <link rel="stylesheet" href="/style.css" />
+
+    <meta property="og:title" content="Open Inspector" />
+    <meta
+      property="og:description"
+      content="Inspect any page's layout, styles and design tokens. No site access requested."
+    />
+    <meta property="og:type" content="website" />
+  </head>
+
+  <body>
+    <div class="wrap">
+      <header class="top">
+        <a class="brand" href="/">
+          <img src="/logo.svg" width="24" height="24" alt="" />
+          Open Inspector
+        </a>
+        <nav>
+          <a href="#why">Why</a>
+          <a href="#what">Features</a>
+          <a href="#compare">Compare</a>
+          <a href="#keys">Shortcuts</a>
+          <a href="#faq">FAQ</a>
+          <a href="#install">Install</a>
+        </nav>
+      </header>
+
+      <div class="hero">
+        <div class="hero-text">
+        <h1>Inspect any page.<br /><em>No site access requested.</em></h1>
+
+        <p class="lede">
+          Every other inspector asks to read and change your data on all websites: your staging
+          environments, your internal dashboards, anything you are logged into. None of them can
+          show you what they do with it. This one asks for nothing, and you can check.
+        </p>
+
+        <div class="actions">
+          <a class="btn" href="https://chromewebstore.google.com/detail/open-inspector/apiiaenebelbejcjpmbcecikmaahpffd">Add to Chrome</a>
+          <a class="btn ghost" href="#verify">See how to verify</a>
+          <span class="note">Free · MIT · no account</span>
+        </div>
+        </div>
+
+        <!--
+          The product, not an illustration of it. Bled off the right edge so it
+          reads as a window rather than a sticker, and hidden on narrow screens
+          where it would be a 300px-tall smudge above the copy that matters.
+        -->
+        <figure class="hero-shot" aria-hidden="true">
+          <!-- The panel has a dark theme; show the one the reader is actually in. -->
+          <picture>
+            <source srcset="/shots/panel-styles-dark.png" media="(prefers-color-scheme: dark)" />
+            <img src="/shots/panel-styles.png" width="348" height="470" alt="" />
+          </picture>
+        </figure>
+      </div>
+
+      <!-- The argument, second on the page, because it is the argument. -->
+      <section id="why">
+        <div class="chapter"><span class="chapter-num">01</span><h2>Why this exists</h2></div>
+        <p class="sub">
+          An inspector runs on whatever you have open. The question is what it is allowed to do
+          there once you have closed the panel, and whether you have any way of finding out.
+        </p>
+
+        <div class="asks">
+          <div class="ask" data-ours="true">
+            <span class="ask-who">Open Inspector</span>
+            <span class="ask-what">No site access requested</span>
+            <p class="ask-why">
+              The manifest declares <code>activeTab</code> and <code>scripting</code>, and no host
+              permissions at all. <code>activeTab</code> is granted by your click, for one tab, and
+              revoked by the browser the moment you navigate away.
+            </p>
+          </div>
+
+          <div class="ask" data-ours="false">
+            <span class="ask-who">The established alternatives</span>
+            <span class="ask-what">Read and change all your data on all websites</span>
+            <p class="ask-why">
+              The standard ask in this category, and a reasonable one for some of what they do. The
+              difficulty is that all of them are closed source, so the permission is the last thing
+              you can verify about them.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="tight" id="how">
+        <div class="chapter"><span class="chapter-num">02</span><h2>How it works</h2></div>
+        <p class="sub">
+          Three steps, and the third is the one that matters: nothing survives the session, because
+          nothing was ever stored.
+        </p>
+
+        <div class="steps">
+          <div class="step">
+            <div class="step-rule"></div>
+            <h3>You invoke it</h3>
+            <p>
+              Click the toolbar button or press <kbd>Alt</kbd><kbd>Shift</kbd><kbd>I</kbd>. That
+              gesture is what grants access, to that one tab. Before it, the extension cannot see
+              the page at all.
+            </p>
+          </div>
+          <div class="step">
+            <div class="step-rule"></div>
+            <h3>You inspect, and edit</h3>
+            <p>
+              Hover to read, click to hold, arrow keys to walk the tree. Values are editable and
+              every change is listed with what it was before.
+            </p>
+          </div>
+          <div class="step">
+            <div class="step-rule"></div>
+            <h3>It leaves</h3>
+            <p>
+              Closing reverts every edit and removes the <code>style</code> attribute it created.
+              Navigating away revokes the grant on its own. Nothing was written down.
+            </p>
+          </div>
+        </div>
+      </section>
+      <section id="what">
+        <div class="chapter"><span class="chapter-num">03</span><h2>What it shows you</h2></div>
+        <p class="sub">
+          Seven panels, in the order the tabs run. The two in the middle are the ones nothing else
+          in this category offers.
+        </p>
+
+        <div class="walk">
+          <div class="walk-rail">
+            <div class="walk-rail-label">Panels</div>
+            <nav aria-label="Panels">
+            <a href="#w-styles" aria-current="true">Styles</a>
+            <a href="#w-color">Color</a>
+            <a href="#w-type">Type</a>
+            <a href="#w-layout">Layout</a>
+            <a href="#w-assets">Assets</a>
+            <a href="#w-markup">Markup</a>
+            <a href="#w-export">Export</a>
+            </nav>
+          </div>
+
+          <div class="walk-stack">
+          <article class="walk-block" id="w-styles">
+            <div class="walk-copy">
+              <h3>Styles</h3>
+              <p class="walk-lead"><b>Everything the cascade decided,</b> and the chance to argue with it. Values are editable, and every edit is exactly revertible.</p>
+              <ul class="walk-list">
+                <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4h12v10H2z"/><path d="M5 7h6v4H5z"/></svg><span>Box model with editable edges</span></li>
+                <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 6h14v4H1z"/><path d="M4 6v2M8 6v3M12 6v2"/></svg><span>Matched rules, overridden declarations struck through</span></li>
+                <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4h12v8H2z"/><path d="M5 7h.01M8 7h.01M11 7h.01M5 10h6"/></svg><span>Forced <code>:hover</code>, <code>:focus</code> and five more</span></li>
+              </ul>
+            </div>
+            <figure class="walk-visual">
+              <picture>
+                <source srcset="/shots/panel-styles-dark.png" media="(prefers-color-scheme: dark)" />
+                <img src="/shots/panel-styles.png" width="348" height="470" loading="lazy"
+                     alt="The Styles panel." />
+              </picture>
+            </figure>
+          </article>
+          <article class="walk-block" id="w-color">
+            <div class="walk-copy">
+              <h3>Color</h3>
+              <p class="walk-lead"><b>Whether anyone can actually read it,</b> not just what the colour is. Live WCAG grading, and an audit of every failing sample on the page.</p>
+              <ul class="walk-list">
+                <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2s4 4.5 4 7a4 4 0 0 1-8 0c0-2.5 4-7 4-7z"/></svg><span>AA/AAA grading with the nearest passing colour</span></li>
+                <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 8s2.5-4 7-4 7 4 7 4-2.5 4-7 4-7-4-7-4z"/><circle cx="8" cy="8" r="1.8"/></svg><span>Screen eyedropper, reading images and canvas</span></li>
+                <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 2h5v5H2zM9 2h5v5H9zM2 9h5v5H2zM9 9h5v5H9z"/></svg><span>Palette clustered in OKLab</span></li>
+              </ul>
+            </div>
+            <figure class="walk-visual">
+              <picture>
+                <source srcset="/shots/panel-color-dark.png" media="(prefers-color-scheme: dark)" />
+                <img src="/shots/panel-color.png" width="348" height="470" loading="lazy"
+                     alt="The Color panel." />
+              </picture>
+            </figure>
+          </article>
+          <article class="walk-block" id="w-type">
+            <div class="walk-copy">
+              <h3>Type</h3>
+              <p class="walk-lead"><b>The font that rendered,</b> not the font that was asked for. Measured on a canvas, because the stack is only a request.</p>
+              <ul class="walk-list">
+                <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h10M8 4v9"/></svg><span>Rendered family, measured rather than guessed</span></li>
+                <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 6h14v4H1z"/><path d="M4 6v2M8 6v3M12 6v2"/></svg><span>Full metrics, all editable</span></li>
+                <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 2h5v5H2zM9 2h5v5H9zM2 9h5v5H2zM9 9h5v5H9z"/></svg><span>Modular scale detection with conformance</span></li>
+              </ul>
+            </div>
+            <figure class="walk-visual">
+              <picture>
+                <source srcset="/shots/panel-type-dark.png" media="(prefers-color-scheme: dark)" />
+                <img src="/shots/panel-type.png" width="348" height="470" loading="lazy"
+                     alt="The Type panel." />
+              </picture>
+            </figure>
+          </article>
+          <article class="walk-block" id="w-layout">
+            <div class="walk-copy">
+              <h3>Layout</h3>
+              <p class="walk-lead"><b>How the page is built,</b> which nothing else in this category reports. Grid and flex anatomy, and the spacing scale it really follows.</p>
+              <ul class="walk-list">
+                <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 2h5v5H2zM9 2h5v5H9zM2 9h5v5H2zM9 9h5v5H9z"/></svg><span>Grid and flex structure, both directions</span></li>
+                <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 6h14v4H1z"/><path d="M4 6v2M8 6v3M12 6v2"/></svg><span>Spacing scale inferred, outliers named</span></li>
+                <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4h12v10H2z"/><path d="M5 7h6v4H5z"/></svg><span>Breakpoints affecting this element</span></li>
+              </ul>
+            </div>
+            <figure class="walk-visual">
+              <picture>
+                <source srcset="/shots/panel-layout-dark.png" media="(prefers-color-scheme: dark)" />
+                <img src="/shots/panel-layout.png" width="348" height="470" loading="lazy"
+                     alt="The Layout panel." />
+              </picture>
+            </figure>
+          </article>
+          <article class="walk-block" id="w-assets">
+            <div class="walk-copy">
+              <h3>Assets</h3>
+              <p class="walk-lead"><b>What the page actually loaded,</b> with thumbnails, because a list of twelve files called icon.svg identifies nothing.</p>
+              <ul class="walk-list">
+                <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h12v10H2z"/><path d="m2 11 3.5-3.5L9 11"/><circle cx="10.5" cy="6" r="1"/></svg><span>The <code>srcset</code> candidate the browser really chose</span></li>
+                <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 5-3 3 3 3M11 5l3 3-3 3"/></svg><span>Inline SVG lifted out as standalone markup</span></li>
+                <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 11V2M5 5l3-3 3 3"/><path d="M2 10v3h12v-3"/></svg><span>Save one file, or copy every URL</span></li>
+              </ul>
+            </div>
+            <figure class="walk-visual">
+              <picture>
+                <source srcset="/shots/panel-assets-dark.png" media="(prefers-color-scheme: dark)" />
+                <img src="/shots/panel-assets.png" width="348" height="470" loading="lazy"
+                     alt="The Assets panel." />
+              </picture>
+            </figure>
+          </article>
+          <article class="walk-block" id="w-markup">
+            <div class="walk-copy">
+              <h3>Markup</h3>
+              <p class="walk-lead"><b>Source you could paste,</b> rather than a recording of the live DOM. Framework bookkeeping is stripped on the way out.</p>
+              <ul class="walk-list">
+                <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 5-3 3 3 3M11 5l3 3-3 3"/></svg><span>HTML or JSX</span></li>
+                <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4h12v10H2z"/><path d="M5 7h6v4H5z"/></svg><span>Hydration ids and framework attributes removed</span></li>
+                <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 6h14v4H1z"/><path d="M4 6v2M8 6v3M12 6v2"/></svg><span>Scripts and script-set inline styles dropped</span></li>
+              </ul>
+            </div>
+            <figure class="walk-visual">
+              <picture>
+                <source srcset="/shots/panel-markup-dark.png" media="(prefers-color-scheme: dark)" />
+                <img src="/shots/panel-markup.png" width="348" height="470" loading="lazy"
+                     alt="The Markup panel." />
+              </picture>
+            </figure>
+          </article>
+          <article class="walk-block" id="w-export">
+            <div class="walk-copy">
+              <h3>Export</h3>
+              <p class="walk-lead"><b>The page's design system,</b> in whatever format the next step needs, including one written for a coding assistant.</p>
+              <ul class="walk-list">
+                <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 11V2M5 5l3-3 3 3"/><path d="M2 10v3h12v-3"/></svg><span>CSS custom properties · SCSS · Tailwind</span></li>
+                <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 5-3 3 3 3M11 5l3 3-3 3"/></svg><span>JSON · W3C design tokens</span></li>
+                <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h10M8 4v9"/></svg><span>Markdown handoff for Cursor or Claude</span></li>
+              </ul>
+            </div>
+            <figure class="walk-visual">
+              <picture>
+                <source srcset="/shots/panel-export-dark.png" media="(prefers-color-scheme: dark)" />
+                <img src="/shots/panel-export.png" width="348" height="470" loading="lazy"
+                     alt="The Export panel." />
+              </picture>
+            </figure>
+          </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="tight" id="keys">
+        <div class="section-head">
+          <h2 class="plain">Every shortcut</h2>
+          <p class="sub">
+            The arrow keys are the part worth knowing. A wrapper with no padding of its own is
+            entirely covered by its children and cannot be clicked at all, and stepping the tree is the
+            only way to reach it.
+          </p>
+        </div>
+
+        <div class="keys">
+          <div class="key-row">
+            <span class="key-combo">
+              <kbd>Alt</kbd><span class="key-plus">+</span><kbd>Shift</kbd><span class="key-plus">+</span><kbd>I</kbd>
+            </span>
+            <span class="key-what"><b>Turn the inspector on or off.</b> Same as clicking the toolbar button. Either one is what grants access to the tab.</span>
+          </div>
+          <div class="key-row">
+            <span class="key-combo"><kbd>Esc</kbd></span>
+            <span class="key-what"><b>Stop picking</b>, so the page is clickable again. Press it again to close, which reverts every edit.</span>
+          </div>
+          <div class="key-row">
+            <span class="key-combo"><kbd>↑</kbd></span>
+            <span class="key-what">Select the <b>parent</b>.</span>
+          </div>
+          <div class="key-row">
+            <span class="key-combo"><kbd>↓</kbd></span>
+            <span class="key-what">Select the <b>first child</b>.</span>
+          </div>
+          <div class="key-row">
+            <span class="key-combo"><kbd>←</kbd> <kbd>→</kbd></span>
+            <span class="key-what">Move to the <b>previous or next sibling</b>.</span>
+          </div>
+          <div class="key-row">
+            <span class="key-combo"><kbd>Click</kbd></span>
+            <span class="key-what"><b>Hold an element</b> and give the page back. Click it again to release.</span>
+          </div>
+          <div class="key-row">
+            <span class="key-combo"><kbd>↑</kbd> <kbd>↓</kbd> <span class="key-plus">in a value</span></span>
+            <span class="key-what">Step a number by <b>1</b>. The page updates as you hold the key rather than waiting for Enter.</span>
+          </div>
+          <div class="key-row">
+            <span class="key-combo"><kbd>Shift</kbd><span class="key-plus">+</span><kbd>↑</kbd> <kbd>↓</kbd></span>
+            <span class="key-what">Step by <b>10</b>.</span>
+          </div>
+          <div class="key-row">
+            <span class="key-combo"><kbd>Alt</kbd><span class="key-plus">+</span><kbd>↑</kbd> <kbd>↓</kbd></span>
+            <span class="key-what">Step by <b>0.1</b>.</span>
+          </div>
+          <div class="key-row">
+            <span class="key-combo"><kbd>Enter</kbd></span>
+            <span class="key-what">Commit an edit. <kbd>Esc</kbd> inside a field restores the previous value instead.</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="tight" id="compare">
+        <div class="section-head">
+          <h2 class="plain">Against the alternatives</h2>
+          <p class="sub">
+            The three established tools are good, and two of them do things this one does not. The
+            difference is what they ask for, and whether you can check.
+          </p>
+        </div>
+
+        <div class="compare-wrap">
+          <table class="compare">
+            <thead>
+              <tr>
+                <th scope="col">&nbsp;</th>
+                <th scope="col" data-ours="true">Open&nbsp;Inspector</th>
+                <th scope="col">CSS&nbsp;Peeper</th>
+                <th scope="col">Hoverify</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Site access requested</th>
+                <td data-ours="true"><span class="yes">none</span></td>
+                <td>all sites</td>
+                <td>all sites</td>
+              </tr>
+              <tr>
+                <th scope="row">Source you can read</th>
+                <td data-ours="true"><span class="yes">MIT</span></td>
+                <td><span class="no">closed</span></td>
+                <td><span class="no">closed</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Price</th>
+                <td data-ours="true"><span class="yes">free</span></td>
+                <td>$2.49–5.99/mo</td>
+                <td>$30/yr · $89</td>
+              </tr>
+              <tr>
+                <th scope="row">Works offline, always</th>
+                <td data-ours="true"><span class="yes">yes</span></td>
+                <td><span class="no">account</span></td>
+                <td>licence check</td>
+              </tr>
+              <tr>
+                <th scope="row">Layout anatomy &amp; spacing scale</th>
+                <td data-ours="true"><span class="yes">yes</span></td>
+                <td><span class="no">no</span></td>
+                <td><span class="no">no</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Design token export</th>
+                <td data-ours="true"><span class="yes">6 formats</span></td>
+                <td><span class="no">no</span></td>
+                <td><span class="no">no</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Page-wide contrast audit</th>
+                <td data-ours="true"><span class="yes">yes</span></td>
+                <td>paid tier</td>
+                <td>yes</td>
+              </tr>
+              <tr>
+                <th scope="row">Screenshots &amp; capture</th>
+                <td data-ours="true"><span class="no">no</span></td>
+                <td><span class="no">no</span></td>
+                <td><span class="yes">yes</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Multi-device preview</th>
+                <td data-ours="true">real window</td>
+                <td><span class="no">no</span></td>
+                <td><span class="yes">33 at once</span></td>
+              </tr>
+              <tr>
+                <th scope="row">SEO &amp; tech-stack tools</th>
+                <td data-ours="true"><span class="no">no</span></td>
+                <td><span class="no">no</span></td>
+                <td><span class="yes">yes</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="compare-note">
+          Read from their own pricing and feature pages, and current as of August 2026. If any of it
+          has gone stale, tell us and it will be corrected. A comparison that overstates a rival's
+          weakness would undermine the only thing this project is actually selling.
+        </p>
+      </section>
+
+      <section id="verify">
+        <div class="chapter"><span class="chapter-num">04</span><h2>Do not take our word for it</h2></div>
+        <p class="sub">
+          Every claim on this page is checked by something that fails the build when it stops being
+          true. That is the point of the project; a promise in a readme is worth very little.
+        </p>
+
+        <div class="checks">
+          <div class="check">
+            <span class="check-value">0</span>
+            <span class="check-label">host permissions</span>
+            <p class="check-how">
+              Chrome's own install screen says so. The manifest has no <code>host_permissions</code>
+              key.
+            </p>
+          </div>
+          <div class="check">
+            <span class="check-value">0</span>
+            <span class="check-label">network requests</span>
+            <p class="check-how">
+              No fetch, XHR, WebSocket or beacon, scanned across source, both manifests and the
+              shipped bundles on every build.
+            </p>
+          </div>
+          <div class="check">
+            <span class="check-value">946</span>
+            <span class="check-label">tests</span>
+            <p class="check-how">
+              908 unit and 38 end-to-end, the latter driving the real packaged extension in a real
+              browser.
+            </p>
+          </div>
+          <div class="check">
+            <span class="check-value">AA</span>
+            <span class="check-label">its own contrast</span>
+            <p class="check-how">
+              The panel grades other pages, so it is held to the same standard in both themes, by a
+              test that measures the real cascade.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="limits">
+        <h2 class="plain">What it does not do</h2>
+        <p class="sub">
+          A tool whose pitch is honesty cannot hide its own constraints. One of these is a decision
+          rather than a gap, and it is marked as such.
+        </p>
+
+        <div class="limits">
+          <div class="limit">
+            <span class="limit-tag">Limit</span>
+            <p>
+              <b>No screenshots, console or network debugging.</b> Those are separate products, and
+              building them is not obviously the right move for this one.
+            </p>
+          </div>
+          <div class="limit">
+            <span class="limit-tag">Limit</span>
+            <p>
+              <b>Cross-origin stylesheets cannot be read.</b> True for every extension. <code>.cssRules</code> throws, and the restriction follows the stylesheet rather than
+              the reader. The panel says so instead of reporting "no rules matched".
+            </p>
+          </div>
+          <div class="limit">
+            <span class="limit-tag">Limit</span>
+            <p>
+              <b>The responsive preview has a floor.</b> It moves the real window so media queries
+              genuinely re-evaluate, but no window goes below the operating system's minimum, about
+              500px on macOS. The panel reports the width it actually got.
+            </p>
+          </div>
+          <div class="limit">
+            <span class="limit-tag" data-kind="choice">Choice</span>
+            <p>
+              <b>No bulk asset download.</b> Zipping every asset means fetching every asset, which
+              would break the only promise here that matters. The Assets tab hands you the URL list
+              for <code>curl</code> instead.
+            </p>
+          </div>
+        </div>
+      </section>
+
+
+      <section class="tight" id="faq">
+        <div class="section-head">
+          <h2 class="plain">Questions worth asking</h2>
+          <p class="sub">
+            Mostly the sceptical ones, because those are the ones that matter for a tool that runs
+            on pages you did not write.
+          </p>
+        </div>
+
+        <div class="faq">
+          <details>
+            <summary>How is it free? What is the catch?</summary>
+            <div class="answer">
+              <p>
+                It has to be. A paid tier needs a licence check, a licence check is a network
+                request, and a network request would break the only promise this extension makes.
+                The constraint is real and it is the reason you can trust the claim.
+              </p>
+              <p>
+                Chrome also shut down its own payments system in 2021, so charging would mean
+                running a payment processor and a licence server. There is a "buy me a coffee" link
+                in the panel footer and that is the entire business model.
+              </p>
+            </div>
+          </details>
+
+          <details>
+            <summary>How do I know it does not phone home?</summary>
+            <div class="answer">
+              <p>
+                Read <code>scripts/check-zero-egress.mjs</code>. It scans the source, both generated
+                manifests and the shipped bundles for <code>fetch</code>,
+                <code>XMLHttpRequest</code>, <code>WebSocket</code> and <code>sendBeacon</code>, and
+                fails the build when it finds one. It runs on every build, so the guarantee cannot
+                quietly lapse.
+              </p>
+              <p>
+                Or read all of it. It is MIT, and that is rather the point, because the other three tools
+                in this category are closed source, so their permission is the last thing you can
+                verify about them.
+              </p>
+            </div>
+          </details>
+
+          <details>
+            <summary>Why not just use DevTools?</summary>
+            <div class="answer">
+              <p>
+                DevTools tells you what one element computes to. This tells you how the page is
+                built: the spacing scale it follows, the type scale behind its headings, its real
+                palette, the breakpoints that affect what you are looking at, and hands you the
+                result as design tokens.
+              </p>
+              <p>
+                It is also considerably faster for the small questions. Hovering to see a font is
+                one gesture rather than four.
+              </p>
+            </div>
+          </details>
+
+          <details>
+            <summary>Is it safe to use on a page I cannot afford to break?</summary>
+            <div class="answer">
+              <p>
+                That was the design constraint. Every edit records the element's prior inline value
+                <em>and</em> its <code>!important</code> state, so reverting restores exactly what
+                was there, including a page's own inline styles that a blanket reset would
+                destroy.
+              </p>
+              <p>
+                Closing the inspector reverts everything and removes the <code>style</code>
+                attribute it created, down to not leaving an empty <code>style=""</code> behind. A
+                reload would discard the edits anyway; leaving marks on a page we were asked only to
+                read would not be acceptable.
+              </p>
+            </div>
+          </details>
+
+          <details>
+            <summary>What happens when it cannot read something?</summary>
+            <div class="answer">
+              <p>
+                It says so, and says why. Cross-origin stylesheets throw on
+                <code>.cssRules</code> for every extension, because the restriction follows the
+                stylesheet rather than the reader, so Matched Rules reports "3 stylesheets are served
+                cross-origin" instead of "no rules matched".
+              </p>
+              <p>
+                Contrast against a gradient is reported as indeterminate rather than guessed. A
+                custom element that rendered something but exposes no children is flagged as
+                probably hiding a closed shadow root, described as the heuristic it is.
+              </p>
+            </div>
+          </details>
+
+          <details>
+            <summary>Does it work in Firefox?</summary>
+            <div class="answer">
+              <p>
+                Yes. Manifest V3, minimum version 115. The screen eyedropper is the one exception:
+                that API is Chromium-only, so the control hides itself rather than failing when
+                pressed.
+              </p>
+            </div>
+          </details>
+
+          <details>
+            <summary>Can my company's IT department approve this?</summary>
+            <div class="answer">
+              <p>
+                It is the one in this category that has a chance. Chrome's install screen shows no
+                site access requested, the manifest has no <code>host_permissions</code> key, and
+                the source is readable. Point them at the repository.
+              </p>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section id="install">
+        <div class="section-head">
+          <h2 class="plain">Install it</h2>
+          <p class="sub">
+            Chrome Web Store review is in progress. Until it clears, building it yourself takes two
+            commands and gives you the same artifact.
+          </p>
+        </div>
+
+        <div class="installs">
+          <div class="install" data-state="ready">
+            <span class="install-state">Available now</span>
+            <h3>Chrome, Edge, Brave</h3>
+            <p>Any Chromium browser. One click, and it asks for no site access.</p>
+            <a class="btn" href="https://chromewebstore.google.com/detail/open-inspector/apiiaenebelbejcjpmbcecikmaahpffd">Add to Chrome</a>
+          </div>
+
+          <div class="install">
+            <span class="install-state">Coming</span>
+            <h3>Firefox</h3>
+            <p>
+              Manifest V3, minimum version 115. Everything works except the eyedropper, which needs
+              an API Firefox does not have.
+            </p>
+          </div>
+
+          <div class="install">
+            <span class="install-state">Or</span>
+            <h3>Build it yourself</h3>
+            <p>
+              Once the repository is public: clone it, then load
+              <code>.output/chrome-mv3</code> as an unpacked extension.
+            </p>
+            <pre><code>pnpm install
+pnpm build</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="closer">
+          <h2>No site access requested</h2>
+          <p>
+            It is the shortest true sentence about this project, and the only one the other three
+            cannot write. Everything else here is a consequence of it.
+          </p>
+          <div class="actions">
+            <a class="btn" href="https://chromewebstore.google.com/detail/open-inspector/apiiaenebelbejcjpmbcecikmaahpffd">Add to Chrome</a>
+            <a class="btn ghost" href="#verify">See how to verify</a>
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        <span>MIT licensed · no telemetry · no account</span>
+        <!--
+          The repository link belongs here, and it is deliberately absent until
+          there is one to point at. A 404 behind the word "Source" on a site
+          whose entire argument is "you can check" would be worse than no link.
+        -->
+        <nav>
+          <a href="/privacy">Privacy</a>
+        </nav>
+      </footer>
+    </div>
+
+    <script>
+      /*
+       * Highlight the rail entry for whatever panel is on screen.
+       *
+       * The only script on this site. It reads scroll position and sets one
+       * attribute; it stores nothing and sends nothing, and the page works
+       * with it blocked, because the rail is anchor links either way.
+       */
+      (function () {
+        var links = document.querySelectorAll('.walk-rail a');
+        if (!links.length || !('IntersectionObserver' in window)) return;
+
+        var byId = {};
+        links.forEach(function (link) { byId[link.getAttribute('href').slice(1)] = link; });
+
+        var observer = new IntersectionObserver(
+          function (entries) {
+            entries.forEach(function (entry) {
+              if (!entry.isIntersecting) return;
+              links.forEach(function (l) { l.removeAttribute('aria-current'); });
+              var active = byId[entry.target.id];
+              if (active) active.setAttribute('aria-current', 'true');
+            });
+          },
+          // A band across the upper middle, so the highlight changes when a
+          // block reaches reading position rather than when it first appears.
+          { rootMargin: '-25% 0px -60% 0px' }
+        );
+
+        document.querySelectorAll('.walk-block').forEach(function (b) { observer.observe(b); });
+      })();
+    </script>
+  </body>
+</html>

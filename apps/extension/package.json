@@ -1,0 +1,25 @@
+{
+  "name": "@open-inspector/extension",
+  "version": "0.0.0",
+  "description": "Open Inspector browser extension shell.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wxt",
+    "dev:firefox": "wxt -b firefox",
+    "build": "wxt build",
+    "build:firefox": "wxt build -b firefox",
+    "zip": "wxt zip",
+    "zip:firefox": "wxt zip -b firefox",
+    "postinstall": "wxt prepare",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@open-inspector/core": "workspace:*",
+    "@open-inspector/ui": "workspace:*"
+  },
+  "devDependencies": {
+    "wxt": "^0.19.29"
+  }
+}

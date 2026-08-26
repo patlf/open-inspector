@@ -1,0 +1,52 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+  * { box-sizing: border-box; margin: 0; }
+  :root {
+    --bg: #14181c;
+    --raised: #1b2126;
+    --ink: #e6eaec;
+    --ink-soft: #b3bcc2;
+    --ink-mute: #838d94;
+    --rule: #2b343a;
+    --accent: #e4743f;
+    --good: #6aab84;
+    --mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  html, body { width: 100%; height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+  /*
+   * The mark is the overlay's own selection marquee: four corner brackets
+   * around empty space. Same shape as the extension icon, so the tile, the
+   * icon and the thing you see on screen are visibly one object.
+   */
+  .mark { flex: none; }
+
+  body { display: flex; flex-direction: column; justify-content: center; padding: 34px 36px; gap: 18px; }
+  .top { display: flex; align-items: center; gap: 12px; }
+  .name { font-family: var(--mono); font-size: 27px; font-weight: 600; letter-spacing: -0.03em; }
+  .claim { font-size: 17px; line-height: 1.4; color: var(--ink-soft); max-width: 20ch; }
+  .claim b { color: var(--ink); font-weight: 600; }
+  .badge {
+    align-self: flex-start;
+    font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase; padding: 6px 10px; border-radius: 4px;
+    color: var(--good); background: rgba(106,171,132,0.14); border: 1px solid rgba(106,171,132,0.45);
+  }
+</style></head><body>
+  <div class="top">
+    <svg class="mark" width="30" height="30" viewBox="0 0 30 30">
+      <g fill="none" stroke="#e4743f" stroke-width="2.6" stroke-linecap="square">
+        <path d="M2 9V2h7M21 2h7v7M28 21v7h-7M9 28H2v-7"/>
+      </g>
+    </svg>
+    <span class="name">Open Inspector</span>
+  </div>
+  <p class="claim">Inspect any page's <b>layout, styles and design tokens</b>.</p>
+  <span class="badge">No site access requested</span>
+</body></html>

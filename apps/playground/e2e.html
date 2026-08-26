@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Open Inspector e2e fixture</title>
+    <style>
+      :root {
+        --ground: #eff1f2;
+        --surface: #ffffff;
+        --ink: #14181c;
+        --rule: #dbe0e3;
+        --accent: #b8451f;
+        --mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        background: var(--ground);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        line-height: 1.6;
+      }
+
+      .page { max-width: 60rem; margin: 0 auto; padding: 2rem 1.5rem 4rem; display: flex; flex-direction: column; gap: 1.5rem; }
+
+      h1 { font-family: var(--mono); font-size: 1.1rem; margin: 0; }
+
+      section { background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 1.25rem; }
+
+      .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 24px; }
+      .card { padding: 16px; border: 2px solid var(--rule); border-radius: 4px; margin: 0; background: #f7f8f9; }
+
+      .flex-row { display: flex; align-items: center; gap: 16px; }
+      .flex-row > .grow { flex: 1 1 auto; padding: 8px; background: #f0f2f3; }
+
+      .hostile-zone * { position: static !important; }
+
+      iframe { width: 100%; height: 100px; border: 2px solid var(--rule); border-radius: 3px; }
+      canvas { border: 2px solid var(--rule); border-radius: 3px; display: block; }
+      .tiny { width: 4px; height: 4px; padding: 10px; background: #d8dde0; }
+      svg .icon-shape { fill: var(--accent); }
+
+      #plain-button {
+        font-family: var(--mono);
+        font-size: 0.8rem;
+        padding: 0.5rem 0.9rem;
+        border: 1px solid var(--accent);
+        border-radius: 3px;
+        background: var(--accent);
+        color: #fff;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="page">
+      <h1>Open Inspector e2e fixture</h1>
+
+      <section>
+        <button id="plain-button" type="button" aria-pressed="false">Click target</button>
+      </section>
+
+      <section>
+        <div class="card-grid">
+          <article class="card">First card</article>
+          <article class="card">Second card</article>
+          <article class="card">Third card</article>
+        </div>
+      </section>
+
+      <section>
+        <div class="flex-row">
+          <span>fixed</span>
+          <div class="grow">flex: 1 1 auto</div>
+          <span>fixed</span>
+        </div>
+      </section>
+
+      <section><outer-widget></outer-widget></section>
+      <section><sealed-widget></sealed-widget></section>
+      <section><canvas id="scene" width="320" height="90"></canvas></section>
+
+      <section>
+        <iframe title="Nested document" srcdoc="&lt;body style=&quot;font:14px system-ui;padding:12px&quot;&gt;Inside a frame&lt;/body&gt;"></iframe>
+      </section>
+
+      <section>
+        <svg width="80" height="80" viewBox="0 0 80 80" aria-label="Decorative mark">
+          <circle class="icon-shape accent" cx="40" cy="40" r="28" />
+        </svg>
+      </section>
+
+      <section class="hostile-zone">
+        <p>This section forces <code>position: static !important</code> on every descendant.</p>
+      </section>
+
+      <section><div class="tiny"></div></section>
+    </div>
+
+    <script>
+      // Proves the overlay does not swallow clicks meant for the page.
+      document.getElementById('plain-button').addEventListener('click', (event) => {
+        event.currentTarget.setAttribute('aria-pressed', 'true');
+      });
+    </script>
+    <script type="module" src="./e2e.ts"></script>
+  </body>
+</html>

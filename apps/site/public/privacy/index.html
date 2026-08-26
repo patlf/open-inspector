@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Privacy Policy — Open Inspector</title>
+    <meta
+      name="description"
+      content="Open Inspector collects nothing, stores nothing, and transmits nothing. No analytics, no telemetry, no account, no licence check, no server."
+    />
+    <link rel="icon" href="/favicon.svg?v=2" type="image/svg+xml" />
+    <link rel="alternate icon" href="/favicon-32.png?v=2" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/icon-128.png?v=2" />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+
+  <body>
+    <div class="wrap">
+      <header class="top">
+        <a class="brand" href="/">
+          <img src="/mark.svg" width="22" height="22" alt="" />
+          Open Inspector
+        </a>
+        <nav><a href="/">Back to the site</a></nav>
+      </header>
+
+      <main class="prose">
+        <h1>Privacy Policy</h1>
+        <p class="updated">Last updated: 25 August 2026</p>
+
+        <p class="big">
+          Open Inspector collects nothing, stores nothing, and transmits nothing. There is no
+          analytics, no telemetry, no crash reporting, no account, no licence check and no server.
+          The extension contains no code capable of making a network request.
+        </p>
+
+        <h2>What data is collected</h2>
+        <p>
+          <b>None.</b> Not anonymised data, not aggregated data, not "usage statistics to improve
+          the product". Nothing leaves your browser, because nothing in the extension is able to
+          send it.
+        </p>
+
+        <h2>What data is stored</h2>
+        <p>
+          <b>None.</b> The extension does not use <code>chrome.storage</code>,
+          <code>localStorage</code>, IndexedDB, cookies, or any other persistence. Everything it
+          reads about a page lives in memory for as long as the panel is open and is discarded when
+          you close it.
+        </p>
+        <p>
+          Any change you make to a page — an edited CSS value, a forced <code>:hover</code> state, a
+          hidden element — is reverted when the inspector closes, and gone entirely on reload.
+        </p>
+
+        <h2>Permissions, and why</h2>
+        <table>
+          <tbody>
+            <tr>
+              <th scope="row"><code>activeTab</code></th>
+              <td>
+                Reads the page you are inspecting. Granted by your click on the toolbar button or
+                your press of the keyboard shortcut, for that one tab, and revoked by the browser
+                when you navigate.
+              </td>
+            </tr>
+            <tr>
+              <th scope="row"><code>scripting</code></th>
+              <td>
+                Injects the inspector into that tab. Without it, <code>activeTab</code> cannot be
+                used.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p>
+          The extension declares <b>no host permissions</b>. Chrome's install screen shows no site
+          access requested. It cannot read a page until you explicitly invoke it, and it cannot read
+          any page you have not invoked it on.
+        </p>
+
+        <h2>Network activity</h2>
+        <p>
+          The extension makes no network requests. This is verified automatically on every build by
+          a script that scans the source, both generated manifests and the shipped bundles for
+          <code>fetch</code>, <code>XMLHttpRequest</code>, <code>WebSocket</code>,
+          <code>sendBeacon</code> and related APIs, and fails the build if any appear.
+        </p>
+        <p>Two behaviours sit close to this line and are worth stating exactly:</p>
+        <ul>
+          <li>
+            <b>Asset thumbnails</b> render the same URL the page has already loaded, so the browser
+            answers from its own cache. The extension issues no request and sends nothing anywhere.
+          </li>
+          <li>
+            <b>Saving an asset</b> hands the browser a link and lets the browser do what browsers
+            do. Inline SVG and <code>data:</code> URIs never touch the network. A remote file costs
+            one browser request — made by the browser, to a URL the page already used, and only
+            after you press save.
+          </li>
+        </ul>
+        <p>
+          The "Buy me a coffee" link in the panel footer is a plain link. It is inert until you
+          click it. It is deliberately <b>not</b> the hosted badge image, because an image would be
+          a request the extension made on every render.
+        </p>
+
+        <h2>Third parties</h2>
+        <p>
+          There are none. No SDKs, no trackers, no fonts loaded from a CDN, no error reporting
+          service. This website has no analytics either, and is served as static files with no
+          server-side code.
+        </p>
+
+        <h2>Children</h2>
+        <p>The extension collects no data from anyone, of any age.</p>
+
+        <h2>Changes to this policy</h2>
+        <p>
+          The extension is open source under the MIT licence. Any change to what it does is visible
+          in its commit history, and the zero-network guarantee is enforced by a test rather than by
+          this document. If this policy changes, the change appears in the repository alongside the
+          commit that caused it.
+        </p>
+
+        <h2>Contact</h2>
+        <p>Open an issue on the project repository.</p>
+      </main>
+
+      <footer>
+        <span>MIT licensed · no telemetry · no account</span>
+        <nav>
+          <a href="/">Home</a>
+          <a href="https://github.com/openinspector/open-inspector">Source</a>
+        </nav>
+      </footer>
+    </div>
+  </body>
+</html>

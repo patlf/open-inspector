@@ -1,0 +1,21 @@
+{
+  "name": "@open-inspector/playground",
+  "version": "0.0.0",
+  "description": "Manual test surface. Hosts the awkward cases the engine has to survive.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@open-inspector/core": "workspace:*",
+    "@open-inspector/ui": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "^6.0.7"
+  }
+}

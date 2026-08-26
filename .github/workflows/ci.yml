@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Covers packages via project references, then each app in turn — the
+      # extension typechecks against WXT's generated config, so it cannot join
+      # the same build graph.
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build (Chrome)
+        run: pnpm build
+
+      - name: Build (Firefox)
+        run: pnpm build:firefox
+
+      # Extensions need the full Chromium build, not the headless shell —
+      # see tests/e2e/fixtures.ts.
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: End-to-end (real extension, real browser)
+        run: pnpm e2e
+
+      - name: Upload traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 7
+
+      # Runs last so it can inspect the shipped bundles and both generated
+      # manifests, not just our source. This is the check that keeps the
+      # project's central claim honest.
+      - name: Zero-egress guard
+        run: pnpm check:egress
+
+      - name: Bundle size budget
+        run: pnpm check:size
+
+  icons-reproducible:
+    name: Icons match their generator
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # The icons are committed but generated. If they drift from the script,
+      # the "you can reproduce our build" claim quietly stops being true.
+      - name: Regenerate icons
+        run: node scripts/gen-icons.mjs
+
+      - name: Fail if icons changed
+        run: git diff --exit-code -- apps/extension/public/icon

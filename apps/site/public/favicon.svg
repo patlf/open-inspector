@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Open Inspector">
+  <rect width="128" height="128" rx="28" fill="#14181c"/>
+  <g fill="none" stroke="#e4743f" stroke-width="12" stroke-linecap="square">
+    <path d="M34.0 54.0V34.0h20"/>
+    <path d="M73.0 34.0h20v20"/>
+    <path d="M93.0 73.0v20h-20"/>
+    <path d="M54.0 93.0h-20v-20"/>
+  </g>
+</svg>

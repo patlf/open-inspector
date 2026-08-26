@@ -1,0 +1,48 @@
+{
+  "name": "open-inspector",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.22.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @open-inspector/extension dev",
+    "dev:firefox": "pnpm --filter @open-inspector/extension dev:firefox",
+    "build": "pnpm --filter @open-inspector/extension build",
+    "build:firefox": "pnpm --filter @open-inspector/extension build:firefox",
+    "zip": "pnpm --filter @open-inspector/extension zip",
+    "typecheck": "tsc --build --force && pnpm -r --filter './apps/*' typecheck && tsc --noEmit -p tests/tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "e2e": "playwright test",
+    "e2e:headed": "HEADED=1 playwright test",
+    "launch": "node scripts/launch-browser.mjs",
+    "lint": "eslint .",
+    "check:egress": "node scripts/check-zero-egress.mjs",
+    "check:size": "node scripts/check-bundle-size.mjs",
+    "gen:icons": "node scripts/gen-icons.mjs",
+    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm check:egress",
+    "sweep": "node scripts/reliability-sweep.mjs",
+    "gen:promo": "node scripts/gen-promo.mjs store/promo/src",
+    "site:dev": "wrangler dev --config apps/site/wrangler.jsonc",
+    "site:deploy": "wrangler deploy --config apps/site/wrangler.jsonc",
+    "check:site": "node scripts/check-site-contrast.mjs && node scripts/check-site-images.mjs",
+    "gen:shots": "node scripts/gen-site-shots.mjs"
+  },
+  "devDependencies": {
+    "@open-inspector/core": "workspace:*",
+    "@playwright/test": "^1.62.1",
+    "@types/chrome": "^0.2.6",
+    "@types/node": "^22.10.2",
+    "@vitest/coverage-v8": "^2.1.8",
+    "esbuild": "^0.28.2",
+    "eslint": "^9.17.0",
+    "happy-dom": "^15.11.7",
+    "playwright": "^1.62.1",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.1",
+    "vitest": "^2.1.8"
+  }
+}

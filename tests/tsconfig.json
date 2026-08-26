@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "noEmit": true,
+    // `chrome` is the global inside service-worker evaluate() callbacks; those
+    // run in the extension's context, not node's.
+    "types": ["node", "chrome"]
+  },
+  "include": ["e2e/**/*", "../playwright.config.ts", "../scripts/sweep/**/*"]
+}

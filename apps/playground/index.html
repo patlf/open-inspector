@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Open Inspector playground</title>
+    <style>
+      :root {
+        --ground: #eff1f2;
+        --surface: #ffffff;
+        --ink: #14181c;
+        --ink-mute: #5c666e;
+        --rule: #dbe0e3;
+        --accent: #b8451f;
+        --mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        background: var(--ground);
+        color: var(--ink);
+        font-family: var(--sans);
+        line-height: 1.6;
+      }
+
+      .page {
+        max-width: 64rem;
+        margin: 0 auto;
+        padding: 2rem 1.5rem 6rem;
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+      }
+
+      header { display: flex; flex-direction: column; gap: 0.75rem; }
+
+      h1 {
+        font-family: var(--mono);
+        font-size: 1.5rem;
+        letter-spacing: -0.02em;
+        margin: 0;
+      }
+
+      h2 {
+        font-family: var(--mono);
+        font-size: 0.75rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--ink-mute);
+        margin: 0 0 0.75rem;
+      }
+
+      p { margin: 0; color: #3d474e; max-width: 60ch; }
+
+      .toolbar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.75rem 0;
+        background: var(--ground);
+        border-bottom: 1px solid var(--rule);
+      }
+
+      button {
+        font-family: var(--mono);
+        font-size: 0.8rem;
+        padding: 0.5rem 0.9rem;
+        border: 1px solid var(--accent);
+        border-radius: 3px;
+        background: var(--accent);
+        color: #fff;
+        cursor: pointer;
+      }
+
+      button[aria-pressed='true'] { background: #14181c; border-color: #14181c; }
+      button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+      .status { font-family: var(--mono); font-size: 0.75rem; color: var(--ink-mute); }
+
+      section { background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 1.25rem; }
+
+      /* A real auto-fit grid, so layout inference has something true to find. */
+      .card-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 24px;
+      }
+
+      .card {
+        padding: 16px;
+        border: 2px solid var(--rule);
+        border-radius: 4px;
+        margin: 0;
+        background: #f7f8f9;
+      }
+
+      .flex-row { display: flex; align-items: center; gap: 16px; }
+      .flex-row > .grow { flex: 1 1 auto; padding: 8px; background: #f0f2f3; }
+
+      .spacer { height: 120px; }
+
+      /* Deliberately hostile: a page rule that would wreck a naive overlay. */
+      .hostile-zone * { position: static !important; }
+
+      iframe { width: 100%; height: 120px; border: 2px solid var(--rule); border-radius: 3px; }
+      canvas { border: 2px solid var(--rule); border-radius: 3px; display: block; }
+
+      .tiny { width: 4px; height: 4px; padding: 10px; background: #d8dde0; }
+
+      svg .icon-shape { fill: var(--accent); }
+    </style>
+  </head>
+
+  <body>
+    <div class="page">
+      <header>
+        <h1>Open Inspector playground</h1>
+        <p>
+          Every block below is a case the engine has to survive. Turn the inspector on and hover.
+          Press Escape to stop.
+        </p>
+        <div class="toolbar">
+          <button id="toggle" type="button" aria-pressed="false">Inspect (off)</button>
+          <span class="status" id="status">idle</span>
+        </div>
+      </header>
+
+      <section>
+        <h2>Auto-fit grid · 24px gaps</h2>
+        <div class="card-grid">
+          <article class="card">Margin, border and padding all differ here.</article>
+          <article class="card">So the four overlay layers should be distinguishable.</article>
+          <article class="card">Orange, yellow, green, blue — outside in.</article>
+        </div>
+      </section>
+
+      <section>
+        <h2>Flex row with a growing child</h2>
+        <div class="flex-row">
+          <span>fixed</span>
+          <div class="grow">flex: 1 1 auto</div>
+          <span>fixed</span>
+        </div>
+      </section>
+
+      <section>
+        <h2>Open shadow root · two levels deep</h2>
+        <outer-widget></outer-widget>
+      </section>
+
+      <section>
+        <h2>Custom element with a closed shadow root</h2>
+        <p>Should report a boundary rather than describing an empty box.</p>
+        <sealed-widget></sealed-widget>
+      </section>
+
+      <section>
+        <h2>Canvas · no DOM inside</h2>
+        <canvas id="scene" width="320" height="90"></canvas>
+      </section>
+
+      <section>
+        <h2>Same-origin iframe</h2>
+        <iframe title="Nested document" srcdoc="&lt;body style=&quot;font:14px system-ui;padding:12px&quot;&gt;Inside a frame&lt;/body&gt;"></iframe>
+      </section>
+
+      <section>
+        <h2>SVG element</h2>
+        <p>Classes on SVG come from an SVGAnimatedString, not a string.</p>
+        <svg width="80" height="80" viewBox="0 0 80 80" aria-label="Decorative mark">
+          <circle class="icon-shape accent" cx="40" cy="40" r="28" />
+        </svg>
+      </section>
+
+      <section class="hostile-zone">
+        <h2>Hostile page CSS</h2>
+        <p>
+          This section forces <code>position: static !important</code> on every descendant. The
+          overlay host must be immune.
+        </p>
+      </section>
+
+      <section>
+        <h2>Degenerate box · padding wider than the element</h2>
+        <div class="tiny"></div>
+      </section>
+
+      <div class="spacer"></div>
+    </div>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

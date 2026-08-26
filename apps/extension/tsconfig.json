@@ -1,0 +1,14 @@
+{
+  "extends": "./.wxt/tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": true,
+    "verbatimModuleSyntax": true,
+    // The UI package is Preact JSX; WXT's generated config does not know that.
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact"
+  },
+  "include": ["entrypoints/**/*", "lib/**/*", "wxt.config.ts", ".wxt/**/*"]
+}

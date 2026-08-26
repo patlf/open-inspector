@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.output/
+.wxt/
+coverage/
+test-results/
+playwright-report/
+*.tsbuildinfo
+.DS_Store
+*.local
+.env
+.env.*
+!.env.example
+
+# Launch strategy, competitor analysis and brand notes. Ours, not the public's.
+SOURCE-OF-TRUTH.md

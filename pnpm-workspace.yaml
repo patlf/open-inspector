@@ -1,0 +1,9 @@
+packages:
+  - packages/*
+  - apps/*
+# esbuild's install script fetches its platform-native binary; Vite cannot
+# build without it. spawn-sync is a legacy polyfill whose optional native
+# build we do not need.
+allowBuilds:
+  esbuild: true
+  spawn-sync: false

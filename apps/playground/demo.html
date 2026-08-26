@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Open Inspector — demo surface</title>
+
+    <!--
+      A page worth photographing.
+
+      The playground exists to break the engine; this exists to show it working.
+      It is deliberately built the way a real site is built — an 8px spacing
+      scale, a modular type scale, a small palette, a grid that reflows at two
+      breakpoints — because the panel's job is to discover exactly those things,
+      and a screenshot of it discovering them on a page with no system would
+      prove nothing.
+
+      Used for store screenshots and, later, the website hero.
+    -->
+    <style>
+      :root {
+        --bg: #ffffff;
+        --raised: #f4f6f7;
+        --sunk: #eaedef;
+        --ink: #14181c;
+        --ink-soft: #3d474e;
+        --ink-mute: #646d73;
+        --rule: #d5dbde;
+        --accent: #b8451f;
+        --accent-wash: rgba(184, 69, 31, 0.08);
+        --good: #3f7d58;
+
+        --mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+        /*
+         * A 1.25 modular scale from a 16px base, so the panel has one to find.
+         * Real design systems have one; a page with arbitrary sizes would prove
+         * nothing about scale detection.
+         */
+        --t-1: 12.8px;
+        --t0: 16px;
+        --t1: 20px;
+        --t2: 25px;
+        --t3: 31.25px;
+        --t4: 39.06px;
+
+        /* An 8px spacing scale, likewise. */
+        --s1: 8px;
+        --s2: 16px;
+        --s3: 24px;
+        --s4: 32px;
+        --s5: 48px;
+        --s6: 64px;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: var(--sans);
+        font-size: var(--t0);
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .wrap { max-width: 880px; margin: 0 auto; padding: var(--s5) var(--s4) var(--s6); }
+
+      /* ---------- masthead ---------- */
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: var(--s1);
+        font-family: var(--mono);
+        font-size: var(--t-1);
+        letter-spacing: 0.02em;
+        color: var(--ink-mute);
+        margin-bottom: var(--s4);
+      }
+      .brand svg { display: block; }
+
+      h1 {
+        margin: 0 0 var(--s2);
+        font-family: var(--mono);
+        font-size: var(--t4);
+        font-weight: 600;
+        letter-spacing: -0.03em;
+        line-height: 1.12;
+        text-wrap: balance;
+      }
+
+      .lede {
+        margin: 0 0 var(--s4);
+        max-width: 34em;
+        font-size: var(--t1);
+        line-height: 1.55;
+        color: var(--ink-soft);
+      }
+
+      .actions { display: flex; flex-wrap: wrap; gap: var(--s2); margin-bottom: var(--s6); }
+
+      .btn {
+        font-family: var(--mono);
+        font-size: var(--t-1);
+        letter-spacing: 0.02em;
+        padding: var(--s1) var(--s2);
+        border-radius: 4px;
+        border: 1px solid var(--accent);
+        background: var(--accent);
+        color: #fff;
+        text-decoration: none;
+        cursor: pointer;
+      }
+      .btn:hover { filter: brightness(1.08); }
+
+      .btn.ghost { background: transparent; color: var(--accent); }
+      .btn.ghost:hover { background: var(--accent-wash); filter: none; }
+
+      /* ---------- sections ---------- */
+
+      section { margin-bottom: var(--s6); }
+
+      h2 {
+        margin: 0 0 var(--s3);
+        font-family: var(--mono);
+        font-size: var(--t1);
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        color: var(--ink);
+        padding-bottom: var(--s1);
+        border-bottom: 1px solid var(--rule);
+      }
+
+      /* Reflows at 720px and again at 520px — two breakpoints to discover. */
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: var(--s3);
+      }
+
+      @media (max-width: 720px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+      @media (max-width: 520px) { .grid { grid-template-columns: 1fr; } }
+
+      .card {
+        padding: var(--s3);
+        border: 1px solid var(--rule);
+        border-radius: 6px;
+        background: var(--bg);
+      }
+
+      .card h3 {
+        margin: 0 0 var(--s1);
+        font-family: var(--mono);
+        font-size: var(--t-1);
+        font-weight: 600;
+        color: var(--accent);
+      }
+
+      .card p { margin: 0; font-size: var(--t0); line-height: 1.55; color: var(--ink-soft); }
+
+      /* ---------- the claim strip ---------- */
+
+      .claim {
+        display: flex;
+        align-items: center;
+        gap: var(--s3);
+        padding: var(--s3);
+        border: 1px solid var(--rule);
+        border-radius: 6px;
+        background: var(--raised);
+      }
+
+      .claim-badge {
+        flex: none;
+        font-family: var(--mono);
+        font-size: var(--t-1);
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        padding: var(--s1) var(--s2);
+        border-radius: 4px;
+        background: rgba(63, 125, 88, 0.14);
+        /*
+         * Not --good.
+         *
+         * The page-wide audit caught this at 3.8:1 while this very page was
+         * being photographed to advertise that audit. 12px bold needs 4.5:1,
+         * and the brand green only reaches 4.1 on its own wash.
+         */
+        color: #356a4a;
+        border: 1px solid rgba(63, 125, 88, 0.4);
+      }
+
+      .claim p { margin: 0; font-size: var(--t0); color: var(--ink-soft); }
+      .claim code {
+        font-family: var(--mono);
+        font-size: var(--t-1);
+        background: var(--sunk);
+        padding: 1px 5px;
+        border-radius: 3px;
+        color: var(--ink);
+      }
+
+      /* ---------- a table, because real pages have them ---------- */
+
+      table { width: 100%; border-collapse: collapse; font-size: var(--t0); }
+
+      th, td {
+        text-align: left;
+        padding: var(--s1) var(--s2);
+        border-bottom: 1px solid var(--rule);
+      }
+
+      th {
+        font-family: var(--mono);
+        font-size: var(--t-1);
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--ink-mute);
+      }
+
+      td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+      /* ---------- footer ---------- */
+
+      footer {
+        padding-top: var(--s3);
+        border-top: 1px solid var(--rule);
+        font-family: var(--mono);
+        font-size: var(--t-1);
+        color: var(--ink-mute);
+        display: flex;
+        justify-content: space-between;
+        gap: var(--s2);
+        flex-wrap: wrap;
+      }
+
+      /*
+        One genuinely low-contrast element, on purpose.
+
+        The page-wide contrast audit needs something to find, and every real
+        site has exactly this: a legal line nobody checked. #a9b0b4 on white is
+        about 2.5:1.
+      */
+      .fineprint { color: #a9b0b4; }
+
+      .demo-logos { display: flex; gap: var(--s3); align-items: center; }
+      .demo-logos svg { display: block; }
+    </style>
+  </head>
+
+  <body>
+    <div class="wrap">
+      <div class="brand">
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+          <rect x="1" y="1" width="14" height="14" rx="3" fill="none" stroke="#b8451f" stroke-width="1.5" />
+          <circle cx="8" cy="8" r="3" fill="none" stroke="#b8451f" stroke-width="1.5" />
+        </svg>
+        Open Inspector
+      </div>
+
+      <h1>Inspect any page without handing over your browsing.</h1>
+
+      <p class="lede">
+        Every other page inspector asks to read and change your data on all websites. This one asks
+        for nothing — no host permissions, no network requests, no account. That is not a promise in
+        a readme; it is a check that fails the build.
+      </p>
+
+      <div class="actions">
+        <a class="btn" href="#install">Add to Chrome</a>
+        <a class="btn ghost" href="#source">Read the source</a>
+      </div>
+
+      <section>
+        <h2>What it reads</h2>
+        <div class="grid">
+          <article class="card">
+            <h3>Layout anatomy</h3>
+            <p>
+              How the element lays out its children, how its parent places it, and the spacing
+              scale the page actually follows.
+            </p>
+          </article>
+          <article class="card">
+            <h3>Real typography</h3>
+            <p>
+              The font that rendered, measured on canvas rather than read off the stack, with full
+              metrics and the modular scale behind them.
+            </p>
+          </article>
+          <article class="card">
+            <h3>Colour and contrast</h3>
+            <p>
+              A palette clustered in OKLab, live WCAG grading, and a page-wide audit that finds
+              every failing pair.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2>Built with</h2>
+        <!-- Real assets, so the Assets panel has something honest to list. -->
+        <div class="demo-logos">
+          <svg width="28" height="28" viewBox="0 0 24 24" aria-label="Grid" role="img">
+            <rect x="3" y="3" width="7" height="7" rx="1" fill="none" stroke="#b8451f" stroke-width="1.6"/>
+            <rect x="14" y="3" width="7" height="7" rx="1" fill="none" stroke="#b8451f" stroke-width="1.6"/>
+            <rect x="3" y="14" width="7" height="7" rx="1" fill="none" stroke="#b8451f" stroke-width="1.6"/>
+            <rect x="14" y="14" width="7" height="7" rx="1" fill="none" stroke="#3f7d58" stroke-width="1.6"/>
+          </svg>
+          <svg width="28" height="28" viewBox="0 0 24 24" aria-label="Type" role="img">
+            <path d="M4 6h16M12 6v13" fill="none" stroke="#14181c" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+          <svg width="28" height="28" viewBox="0 0 24 24" aria-label="Contrast" role="img">
+            <circle cx="12" cy="12" r="9" fill="none" stroke="#14181c" stroke-width="1.6"/>
+            <path d="M12 3a9 9 0 0 1 0 18z" fill="#14181c"/>
+          </svg>
+        </div>
+      </section>
+
+      <section>
+        <h2>What it asks for</h2>
+        <div class="claim">
+          <span class="claim-badge">NO SITE ACCESS</span>
+          <p>
+            The manifest requests <code>activeTab</code> and <code>scripting</code>, and declares no
+            host permissions at all. Chrome's own install screen will tell you the same thing.
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2>Measured</h2>
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Property</th>
+              <th scope="col">Value</th>
+              <th scope="col">Checked by</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Host permissions</td>
+              <td class="num">0</td>
+              <td>check-zero-egress</td>
+            </tr>
+            <tr>
+              <td>Network requests</td>
+              <td class="num">0</td>
+              <td>check-zero-egress</td>
+            </tr>
+            <tr>
+              <td>Unit tests</td>
+              <td class="num">908</td>
+              <td>vitest</td>
+            </tr>
+            <tr>
+              <td>Bundle, gzipped</td>
+              <td class="num">79.7 KB</td>
+              <td>check-bundle-size</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <footer>
+        <span>MIT licensed · no telemetry · no account</span>
+        <span class="fineprint">Nothing here is transmitted anywhere.</span>
+      </footer>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,21 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "open-inspector-site",
+  "compatibility_date": "2026-08-20",
+
+  /*
+   * No `main`, on purpose.
+   *
+   * A Worker script would be a server, and this site has nothing to serve
+   * dynamically. Static assets alone means there is no runtime code, nothing to
+   * log, and nothing that could quietly collect a visitor's details — which is
+   * the same claim the extension makes, so the site should be able to make it
+   * too.
+   */
+  "assets": {
+    "directory": "./public",
+    "not_found_handling": "404-page"
+  },
+
+  "observability": { "enabled": true }
+}
