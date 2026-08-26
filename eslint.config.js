@@ -2,12 +2,26 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
+    /*
+     * Build output and tool scratch space, not source.
+     *
+     * `.wrangler/` is the one that bites: wrangler writes generated bundles and
+     * a no-op worker into `.wrangler/tmp` whenever the site is served or
+     * deployed, and those are third-party code written in a style this config
+     * rejects. CI ran the site before linting and failed on fifteen errors in
+     * files nobody wrote.
+     */
     ignores: [
       '**/node_modules/**',
       '**/dist/**',
       '**/.output/**',
       '**/.wxt/**',
+      '**/.wrangler/**',
+      // Harness config and vendored skill scripts, not this project's source.
+      '**/.claude/**',
       '**/coverage/**',
+      '**/test-results/**',
+      '**/playwright-report/**',
       '**/*.tsbuildinfo',
     ],
   },
