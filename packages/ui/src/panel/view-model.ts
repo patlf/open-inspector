@@ -19,6 +19,12 @@ export interface Field {
   /** Renders a colour chip before the value. */
   swatch?: string | undefined;
   /**
+   * Where a colour picked from the swatch is written, when that is not
+   * `property` itself — a `border` row shows the shorthand but its colour
+   * belongs to `border-color`.
+   */
+  swatchProperty?: string | undefined;
+  /**
    * The CSS property this row shows.
    *
    * Present only on rows that map to exactly one declaration — those are the

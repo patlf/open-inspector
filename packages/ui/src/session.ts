@@ -91,7 +91,21 @@ function describeForList(element: Element): string {
  * Without this, clicking a link to inspect it navigates away instead. They
  * come off the moment the picker is disarmed.
  */
-const SUPPRESSED_EVENTS = ['pointerdown', 'mousedown', 'mouseup', 'click', 'auxclick'] as const;
+const SUPPRESSED_EVENTS = [
+  'pointerdown',
+  'pointerup',
+  'mousedown',
+  'mouseup',
+  'click',
+  'dblclick',
+  'auxclick',
+] as const;
+
+/**
+ * Input types that do nothing with arrow keys, so they are free to walk the
+ * tree. Radios and ranges are absent on purpose: arrows change their value.
+ */
+const NON_TEXT_INPUTS = new Set(['button', 'checkbox', 'submit', 'reset', 'image', 'color', 'file']);
 
 /**
  * Drive the overlay and panel from pointer movement.
@@ -119,6 +133,21 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
   let pointerX = 0;
   let pointerY = 0;
   let previousCursor: string | null = null;
+  /** Whether `<html>` had a style attribute before we set a cursor on it. */
+  let hadRootStyle = false;
+
+  /**
+   * Put the root's cursor back — and the attribute, if we created it.
+   *
+   * Restoring `cursor` to '' empties the declaration but leaves `style=""`
+   * on `<html>`, so a page that had no style attribute was not left exactly
+   * as it was found.
+   */
+  function restoreCursor(): void {
+    const root = doc.documentElement;
+    root.style.cursor = previousCursor ?? '';
+    if (!hadRootStyle && root.style.length === 0) root.removeAttribute('style');
+  }
   let pinnedElement: Element | null = null;
 
   /**
@@ -134,6 +163,8 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
 
   /** Built once per session: walking every rule in every sheet is not cheap. */
   let styleIndex: cascade.StyleIndex | null = null;
+  /** The page the caches were built for — see `pageKey`. */
+  let cachedFor: string | null = null;
   let scanner: PageScanner | null = null;
   let settleTimer: number | null = null;
   let currentElement: Element | null = null;
@@ -147,6 +178,8 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
    * lazily: a read-only session should not carry an override store around.
    */
   let overrides: edit.OverrideStore | null = null;
+  /** A close was asked for with edits pending; the next one goes through. */
+  let confirmingClose = false;
   let viewportWidth: number | null = null;
   /** What the viewport actually became. Not always what was asked for. */
   let viewportActual: number | null = null;
@@ -181,6 +214,9 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
   }
 
   function ensureStyleIndex(): cascade.StyleIndex {
+    // Checked on every collect, not only when the element changes: a router
+    // can swap the stylesheets under an element it keeps mounted.
+    dropStaleCaches();
     // The index classifies each sheet; `null` asks it to work the kind out
     // from the sheet itself rather than us guessing.
     styleIndex ??= cascade.buildStyleIndex(
@@ -190,7 +226,7 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
   }
 
   function ensureOverlay(): Overlay {
-    overlay ??= createOverlay(doc);
+    overlay ??= createOverlay(doc, { onAttach: () => panel?.raise() });
     return overlay;
   }
 
@@ -390,6 +426,9 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
       },
 
       runContrastAudit(): void {
+        // Settle the cache key first, or the next page scan would see this
+        // page as a new one and discard the audit just run against it.
+        dropStaleCaches();
         scanner ??= createPageScanner({ doc, view: win, ignore: isOurs });
         contrastAudit = scanner.auditContrast();
         scheduleRender();
@@ -483,7 +522,8 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
       onTogglePicking: () => setPicking(!picking),
       onSelectAncestor: selectAncestor,
       onStep: stepSelection,
-      onClose: () => deactivate(),
+      onClose: requestClose,
+      onCancelClose: cancelClose,
       onPinnedChange: (isPinned) => {
         if (!isPinned) {
           pinnedElement = null;
@@ -566,6 +606,14 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
       data.editsPrompt = overrides.toPrompt();
     }
 
+    // A pending close confirmation quotes a count; keep it honest as edits
+    // are reverted underneath it, and drop it once nothing would be lost.
+    if (confirmingClose) {
+      const pending = overrides?.count() ?? 0;
+      if (pending === 0) cancelClose();
+      else panel?.setConfirmClose(pending);
+    }
+
     // Page-wide findings persist across hovers: the palette does not change
     // because the pointer moved. Breakpoints refresh on the next settle.
     if (pageData) {
@@ -590,27 +638,75 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
     settleTimer = win.setTimeout(() => {
       settleTimer = null;
       if (!active || !element.isConnected) return;
-
-      /**
-       * Work out which states the page styles, here rather than on first click.
-       *
-       * Built lazily it used to answer "all of them" until someone pressed a
-       * toggle, at which point the truthful — usually much shorter — list
-       * arrived and the row visibly rearranged under the pointer. Worse, the
-       * state just forced could land outside it and its own toggle would go
-       * disabled, with no way left to turn it off.
-       *
-       * This walk costs one pass over the document's rules, which is why it
-       * rides along with the page scan instead of blocking the first paint.
-       */
-      ensurePseudoStates();
-
-      scanner ??= createPageScanner({ doc, view: win, ignore: isOurs });
-      pageData = scanner.scan(element);
-
-      // Repaint with the deep findings merged in.
-      if (currentElement) show(currentElement, null);
+      void runSettledScan(element);
     }, SETTLE_DELAY_MS);
+  }
+
+  /** Only the newest settle may write its findings; older ones were overtaken. */
+  let settleToken = 0;
+
+  async function runSettledScan(element: Element): Promise<void> {
+    const token = ++settleToken;
+    dropStaleCaches();
+
+    /**
+     * Work out which states the page styles, here rather than on first click.
+     *
+     * Built lazily it used to answer "all of them" until someone pressed a
+     * toggle, at which point the truthful — usually much shorter — list
+     * arrived and the row visibly rearranged under the pointer. Worse, the
+     * state just forced could land outside it and its own toggle would go
+     * disabled, with no way left to turn it off.
+     *
+     * This walk costs one pass over the document's rules, which is why it
+     * rides along with the page scan instead of blocking the first paint.
+     */
+    ensurePseudoStates();
+
+    scanner ??= createPageScanner({ doc, view: win, ignore: isOurs });
+    const pageScanner = scanner;
+    // The document walk yields between phases, so the page stays responsive
+    // while it runs. Anything can happen in those gaps — a close, a new
+    // selection — so every assumption is re-checked once it finishes.
+    await pageScanner.warm();
+    if (!active || !element.isConnected || scanner !== pageScanner || token !== settleToken) return;
+
+    pageData = pageScanner.scan(element);
+
+    // Repaint with the deep findings merged in.
+    if (currentElement) show(currentElement, null);
+  }
+
+  /**
+   * Which page the caches describe.
+   *
+   * The style index and page scan survive closing the panel, so reopening on
+   * the same page does not pay for the walk twice. On a single-page app,
+   * "the same page" can be a different route with different stylesheets, and
+   * a cache keyed on nothing kept reporting the old route's rules, palette
+   * and assets. The path plus the stylesheet count catches route changes and
+   * lazily-loaded CSS; a hash change alone is not a new page.
+   */
+  function pageKey(): string {
+    const location = doc.location;
+    const path = location ? `${location.origin}${location.pathname}${location.search}` : '';
+    return `${path}|${doc.styleSheets.length}`;
+  }
+
+  function dropStaleCaches(): void {
+    const key = pageKey();
+    if (cachedFor === key) return;
+    const changed = cachedFor !== null;
+    cachedFor = key;
+    if (!changed) return;
+
+    styleIndex = null;
+    scanner?.invalidate();
+    pageData = undefined;
+    contrastAudit = null;
+    // The page-wide findings were just dropped; fetch the new page's.
+    const selected = pinnedElement ?? currentElement;
+    if (active && selected) scheduleSettledScan(selected);
   }
 
   function render(): void {
@@ -687,7 +783,24 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
     scheduleRender();
   }
 
-/** Arrow keys that move the selection around the tree. */
+  /**
+   * Is the page's own focus somewhere the user types?
+   *
+   * Once the page is handed back (picking off, element pinned), someone may
+   * click into a search box or a textarea on the page. Arrow keys there move
+   * the caret; taking them would make the page feel broken while we are open.
+   */
+  function isEditable(element: Element | null): boolean {
+    if (!element) return false;
+    if ((element as HTMLElement).isContentEditable) return true;
+    const tag = element.tagName;
+    if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
+    if (tag !== 'INPUT') return false;
+    const type = (element as HTMLInputElement).type;
+    return !NON_TEXT_INPUTS.has(type);
+  }
+
+  /** Arrow keys that move the selection around the tree. */
   const TREE_KEYS: Record<string, TreeDirection> = {
     ArrowUp: 'parent',
     ArrowDown: 'child',
@@ -708,8 +821,9 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
      */
     const focusInPanel = panel?.owns(doc.activeElement ?? doc.body) ?? false;
     const direction = TREE_KEYS[key];
+    const typingInPage = !focusInPanel && isEditable(doc.activeElement);
 
-    if (direction && !focusInPanel && (pinnedElement ?? currentElement)) {
+    if (direction && !focusInPanel && !typingInPage && (pinnedElement ?? currentElement)) {
       event.preventDefault();
       event.stopPropagation();
       stepSelection(direction);
@@ -732,8 +846,33 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
     } else if (picking) {
       setPicking(false);
     } else {
-      deactivate();
+      requestClose();
     }
+  }
+
+  /**
+   * Close — unless that would silently throw work away.
+   *
+   * Closing reverts every edit, which is the promise the page depends on. But
+   * an Escape pressed one time too many should not cost ten minutes of
+   * nudging values, with nothing on screen saying it happened. With edits
+   * pending, the first request says what closing will do and the second one
+   * (Escape or the button again) does it.
+   */
+  function requestClose(): void {
+    const pending = overrides?.count() ?? 0;
+    if (pending === 0 || confirmingClose || !panel) {
+      deactivate();
+      return;
+    }
+    confirmingClose = true;
+    panel.setConfirmClose(pending);
+  }
+
+  function cancelClose(): void {
+    if (!confirmingClose) return;
+    confirmingClose = false;
+    panel?.setConfirmClose(null);
   }
 
   /**
@@ -747,6 +886,15 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
   function onPageInteraction(event: Event): void {
     const target = event.target;
     if (target instanceof Element && isOurs(target)) return;
+    /**
+     * Only a person's click is ours to capture.
+     *
+     * Saving an asset works by clicking a hidden download link in the page's
+     * main world, and swallowing that synthetic click made Save silently do
+     * nothing whenever the picker was armed — which is the default. Script
+     * clicks were never what this guard was for.
+     */
+    if (!event.isTrusted) return;
 
     event.preventDefault();
     event.stopPropagation();
@@ -789,6 +937,10 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
 
     const sameElement = pinnedElement === result.element;
     pinnedElement = sameElement ? null : result.element;
+    // render() only schedules the page scan when the element changes, and this
+    // sets currentElement itself — so a tap with no hover frame before it (a
+    // touch or pen, or a click straight after activating) would never get one.
+    if (pinnedElement && currentElement !== pinnedElement) scheduleSettledScan(pinnedElement);
     currentElement = result.element;
     panel?.setPinned(pinnedElement !== null);
     scheduleRender();
@@ -843,7 +995,7 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
       addPickingListeners();
     } else {
       removePickingListeners();
-      doc.documentElement.style.cursor = previousCursor ?? '';
+      restoreCursor();
       overlay?.hide();
     }
 
@@ -856,7 +1008,9 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
     // would attach a second overlay to a page that already has a live one.
     if (destroyed || active) return;
     active = true;
+    dropStaleCaches();
 
+    hadRootStyle = doc.documentElement.hasAttribute('style');
     previousCursor = doc.documentElement.style.cursor;
     doc.documentElement.style.cursor = 'crosshair';
     picking = true;
@@ -870,6 +1024,8 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
   function deactivate(): void {
     if (!active) return;
     active = false;
+    confirmingClose = false;
+    panel?.setConfirmClose(null);
 
     cancelPendingRender();
     removeSessionListeners();
@@ -904,7 +1060,7 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
     panel?.destroy();
     panel = null;
 
-    doc.documentElement.style.cursor = previousCursor ?? '';
+    restoreCursor();
     previousCursor = null;
 
     options.onDeactivate?.();

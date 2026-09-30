@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Open Inspector keyboard fixture</title>
+    <style>
+      body { margin: 0; font: 15px/1.5 system-ui, sans-serif; color: #14181c; background: #f4f5f6; }
+      main { max-width: 36rem; margin: 0 2rem; padding: 2rem 0; display: grid; gap: 1.5rem; }
+      .parent { display: flex; gap: 12px; padding: 16px; background: #fff; border: 1px solid #c9d0d4; }
+      .child { flex: 1; padding: 12px; background: #e8eef2; }
+      .child:hover { background: #dce6ec; }
+      label { display: grid; gap: 4px; }
+      input { font: inherit; padding: 6px 8px; width: 16rem; }
+    </style>
+  </head>
+  <body>
+    <!--
+      A small, predictable tree for walking with the arrow keys:
+      #tree > #parent > (#c1, #c2, #c3), and a page text field whose own
+      arrow keys must keep moving its caret while the inspector is open.
+    -->
+    <main id="tree">
+      <section id="parent" class="parent">
+        <div id="c1" class="child">One</div>
+        <div id="c2" class="child">Two</div>
+        <div id="c3" class="child">Three</div>
+      </section>
+      <label>
+        Page field
+        <input id="page-input" type="text" value="abcdef" />
+      </label>
+    </main>
+  </body>
+</html>

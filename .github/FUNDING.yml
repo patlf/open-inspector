@@ -1,2 +1,3 @@
-# Fill in the handle and GitHub adds a Sponsor button to the repo header.
-# custom: ['https://buymeacoffee.com/YOUR-HANDLE']
+# Shown as the Sponsor button in the repo header. The same page the panel's
+# footer links to — see SUPPORT_URL in packages/ui/src/panel/Panel.tsx.
+buy_me_a_coffee: openinspector

@@ -133,20 +133,80 @@ function formatBytes(bytes: number): string {
 const PREVIEWABLE = new Set(['image', 'svg']);
 
 /**
+ * URLs the page has already fetched, so a thumbnail of one is a cache hit.
+ *
+ * An asset being *referenced* is not the same as it being *loaded*: `og:image`,
+ * every favicon size, `prefetch` hints and the background of a `display:none`
+ * element are all listed without ever being requested. Rendering those in an
+ * `<img>` would make the first request for them — often to a third-party CDN,
+ * with a Referer — and it would be ours, not the page's.
+ *
+ * Resource Timing lists what the page fetched, and a finished `<img>` is proof
+ * of its own. The timing buffer can fill up (250 entries by default), so on a
+ * very heavy page some loaded assets will show "not loaded by the page". That
+ * is the safe direction to be wrong in.
+ */
+export function collectLoadedUrls(doc: Document, view: Window): Set<string> {
+  const loaded = new Set<string>();
+
+  /**
+   * A prefetch is fetched, but into the HTTP cache for a *future* navigation
+   * rather than this document's memory cache — so rendering one is a new
+   * request after all. Resource Timing lists it all the same, so it is
+   * excluded here unless the page also rendered it (the <img> pass below).
+   */
+  const prefetched = new Set<string>();
+  for (const link of Array.from(doc.querySelectorAll('link[rel~="prefetch" i]'))) {
+    const href = (link as HTMLLinkElement).href;
+    if (href) prefetched.add(href);
+  }
+
+  try {
+    for (const entry of view.performance.getEntriesByType('resource')) {
+      if (prefetched.has(entry.name)) continue;
+      // A 404 is "fetched" too, and re-requesting it gets another 404.
+      const status = (entry as PerformanceResourceTiming & { responseStatus?: number }).responseStatus;
+      if (typeof status === 'number' && status >= 400) continue;
+      loaded.add(entry.name);
+    }
+  } catch {
+    // No Resource Timing: fall through to what the DOM can prove.
+  }
+  for (const image of Array.from(doc.querySelectorAll('img'))) {
+    if (image.complete && image.naturalWidth > 0 && image.currentSrc) loaded.add(image.currentSrc);
+  }
+  return loaded;
+}
+
+/** Local to the page, so rendering one can never reach a network. */
+function isLocalUrl(url: string): boolean {
+  return url.startsWith('data:') || url.startsWith('blob:');
+}
+
+const NOT_LOADED = 'not loaded by the page';
+
+/**
  * What to put in the thumbnail slot.
  *
- * For URL assets this is the very URL the page already loaded, so the browser
- * answers from its cache and nothing new is requested. The extension still
- * issues no request of its own and sends nothing anywhere — see the note on
- * the zero-egress boundary in the README.
+ * Only a URL that renders without a request: inline data, a blob, or something
+ * the page itself already fetched (see `collectLoadedUrls`). Everything else
+ * gets a note instead of a preview, because the thumbnail would otherwise be
+ * the extension's own network request.
  */
-function previewFor(asset: assets.UrlAsset): { preview?: string; noPreview?: string } {
+function previewFor(
+  asset: assets.UrlAsset,
+  loaded: ReadonlySet<string>,
+): { preview?: string; noPreview?: string } {
   if (asset.truncatedUrl) return { noPreview: 'too large to preview inline' };
   if (!PREVIEWABLE.has(asset.kind)) return { noPreview: asset.kind };
+  if (!isLocalUrl(asset.url) && !loaded.has(asset.url)) return { noPreview: NOT_LOADED };
   return { preview: asset.url };
 }
 
-function toAssets(inventory: assets.AssetInventory): AssetEntry[] {
+export function toAssets(
+  inventory: assets.AssetInventory,
+  loaded: ReadonlySet<string>,
+): AssetEntry[] {
   const dimensionsByUrl = new Map<string, string>();
   for (const image of inventory.images) {
     // currentSrc is what the browser actually chose out of a srcset, which is
@@ -158,7 +218,7 @@ function toAssets(inventory: assets.AssetInventory): AssetEntry[] {
   }
 
   const entries: AssetEntry[] = inventory.assets.slice(0, MAX_ASSETS).map((asset, index) => {
-    const { preview, noPreview } = previewFor(asset);
+    const { preview, noPreview } = previewFor(asset, loaded);
 
     const entry: AssetEntry = {
       kind: asset.kind,
@@ -216,9 +276,11 @@ function toAssets(inventory: assets.AssetInventory): AssetEntry[] {
       url: video.currentSrc ?? video.src ?? video.sources[0]?.url ?? video.poster ?? '',
       name: `video ${index + 1}`,
     };
-    // A poster frame is the only still a video has; use it as the thumbnail.
-    if (video.poster) entry.preview = video.poster;
-    else entry.noPreview = 'no poster frame';
+    // A poster frame is the only still a video has; use it as the thumbnail —
+    // but only if the page fetched it, for the same reason as `previewFor`.
+    if (!video.poster) entry.noPreview = 'no poster frame';
+    else if (isLocalUrl(video.poster) || loaded.has(video.poster)) entry.preview = video.poster;
+    else entry.noPreview = NOT_LOADED;
     if (video.intrinsic.known) {
       entry.dimensions = `${video.intrinsic.width} × ${video.intrinsic.height}`;
     }
@@ -369,9 +431,27 @@ function runContrastAudit(
   };
 }
 
+/**
+ * Give the page a turn.
+ *
+ * `scheduler.yield()` where it exists (Chrome 129+) keeps our continuation at
+ * the front of the queue; elsewhere a zero-delay timeout still lets input and
+ * rendering in between phases.
+ */
+function yieldToPage(view: Window): Promise<void> {
+  const scheduler = (view as Window & { scheduler?: { yield?: () => Promise<void> } }).scheduler;
+  if (typeof scheduler?.yield === 'function') return scheduler.yield();
+  return new Promise((resolve) => view.setTimeout(resolve, 0));
+}
+
 export interface PageScanner {
-  /** Full findings for one element. Cheap after the first call. */
+  /** Full findings for one element. Cheap after the first call, or after `warm`. */
   scan(element: Element): PageData;
+  /**
+   * Do the document-wide walk ahead of `scan`, yielding to the page between
+   * phases. Resolves once `scan` is cheap. Safe to call repeatedly.
+   */
+  warm(): Promise<void>;
   /**
    * Audit every text sample on the page.
    *
@@ -397,8 +477,21 @@ export function createPageScanner(options: PageScanOptions = {}): PageScanner {
   const view = options.view ?? doc.defaultView ?? window;
 
   let cached: Omit<PageData, 'breakpoints' | 'exports'> | null = null;
+  let warming: Promise<void> | null = null;
+  /** Bumped by `invalidate`, so a warm that started before it cannot land after it. */
+  let generation = 0;
 
-  function scanDocument(): Omit<PageData, 'breakpoints' | 'exports'> {
+  /**
+   * The document walk, as a sequence of phases.
+   *
+   * Each phase is bounded, but together — palette, type, spacing, then assets
+   * with three computed-style reads per element — they made one long task
+   * that froze a heavy page for a visible moment right after the pointer
+   * stopped. Written as a generator so the same code runs straight through
+   * (`scan` on a cold cache) or with a yield to the page between phases
+   * (`warm`).
+   */
+  function* scanPhases(): Generator<void, Omit<PageData, 'breakpoints' | 'exports'>> {
     const root = doc.documentElement;
 
     const paletteResult = color.collectPalette(root, {
@@ -406,6 +499,7 @@ export function createPageScanner(options: PageScanOptions = {}): PageScanner {
       maxElements: ELEMENT_BUDGET,
       ...(options.ignore ? { shouldSkip: options.ignore } : {}),
     });
+    yield;
 
     const faces = typography.collectFontFaces(doc);
     const typeScale = typography.inferTypeScaleForSubtree(root, {
@@ -413,11 +507,14 @@ export function createPageScanner(options: PageScanOptions = {}): PageScanner {
       limit: ELEMENT_BUDGET,
       ...(options.ignore ? { shouldSkip: options.ignore } : {}),
     });
+    yield;
+
     const spacing = layout.analyzeSpacingScale(root, {
       view,
       maxElements: ELEMENT_BUDGET,
       ...(options.ignore ? { shouldSkip: options.ignore } : {}),
     });
+    yield;
 
     const inventory = assets.collectAssets({
       document: doc,
@@ -447,7 +544,7 @@ export function createPageScanner(options: PageScanOptions = {}): PageScanner {
       fonts: [...fontUsage.values()],
       typeScale: toTypeScale(typeScale),
       spacingScale: toSpacingScale(spacing.scale),
-      assets: toAssets(inventory),
+      assets: toAssets(inventory, collectLoadedUrls(doc, view)),
       // Any walk hitting its budget means the answer is partial. Wikipedia's
       // article page exhausts the element budget, and silently showing a
       // shortened list would read as "this is everything".
@@ -456,7 +553,38 @@ export function createPageScanner(options: PageScanOptions = {}): PageScanner {
     };
   }
 
+  function scanDocument(): Omit<PageData, 'breakpoints' | 'exports'> {
+    const phases = scanPhases();
+    for (;;) {
+      const step = phases.next();
+      if (step.done) return step.value;
+    }
+  }
+
+  async function warmDocument(): Promise<void> {
+    const started = generation;
+    const phases = scanPhases();
+    for (;;) {
+      const step = phases.next();
+      if (step.done) {
+        if (started === generation) cached = step.value;
+        return;
+      }
+      await yieldToPage(view);
+      // Invalidated mid-walk: this result describes a page that is gone.
+      if (started !== generation) return;
+    }
+  }
+
   return {
+    warm() {
+      if (cached) return Promise.resolve();
+      warming ??= warmDocument().finally(() => {
+        warming = null;
+      });
+      return warming;
+    },
+
     scan(element) {
       cached ??= scanDocument();
 
@@ -474,6 +602,8 @@ export function createPageScanner(options: PageScanOptions = {}): PageScanner {
 
     invalidate() {
       cached = null;
+      warming = null;
+      generation += 1;
     },
   };
 }

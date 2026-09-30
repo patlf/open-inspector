@@ -2,12 +2,10 @@ import { defineBackground } from 'wxt/sandbox';
 import {
   INSPECTOR_SCRIPT,
   PING,
-  RESIZE,
-  SAVE,
   TOGGLE,
-  type ResizeMessage,
+  isResizeMessage,
+  isSaveMessage,
   type ResizeResponse,
-  type SaveMessage,
   type ToggleResponse,
 } from '../lib/messages.js';
 
@@ -34,7 +32,7 @@ async function isInjected(tabId: number): Promise<boolean> {
  * browser reserves — the web store, `about:` and `chrome://` URLs, PDF viewers
  * — and there is nothing to be done about that beyond failing quietly.
  */
-async function toggleInspector(tabId: number): Promise<void> {
+async function toggleInspectorNow(tabId: number): Promise<void> {
   try {
     if (!(await isInjected(tabId))) {
       await browser.scripting.executeScript({
@@ -57,6 +55,27 @@ async function toggleInspector(tabId: number): Promise<void> {
     // console.
     console.debug('[open-inspector] could not toggle on tab', tabId, error);
   }
+}
+
+/** The toggle still in flight for each tab. */
+const pendingToggles = new Map<number, Promise<void>>();
+
+/**
+ * Toggle, one request at a time per tab.
+ *
+ * Two quick clicks used to run side by side: both pings missed, both injected
+ * the script, and the tab ended up with two inspectors or none. Chaining each
+ * toggle onto the last means the second click sees the first one's result —
+ * two clicks are exactly on then off.
+ */
+function toggleInspector(tabId: number): Promise<void> {
+  const previous = pendingToggles.get(tabId) ?? Promise.resolve();
+  const next = previous.then(() => toggleInspectorNow(tabId));
+  pendingToggles.set(tabId, next);
+  void next.finally(() => {
+    if (pendingToggles.get(tabId) === next) pendingToggles.delete(tabId);
+  });
+  return next;
 }
 
 /**
@@ -253,9 +272,10 @@ export default defineBackground(() => {
         tab?: { id?: number | undefined; windowId?: number | undefined } | undefined;
       },
     ): Promise<ResizeResponse> | undefined => {
-      const request = message as SaveMessage | ResizeMessage | undefined;
-
-      if (request?.type === RESIZE) {
+      // Checked, not cast: a malformed save would otherwise run an arbitrary
+      // href in the page's main world.
+      if (isResizeMessage(message)) {
+        const request = message;
         const windowId = sender.tab?.windowId;
         if (windowId == null) {
           return Promise.resolve({ ok: false, error: 'no window for this tab' });
@@ -272,7 +292,8 @@ export default defineBackground(() => {
         );
       }
 
-      if (request?.type !== SAVE) return undefined;
+      if (!isSaveMessage(message)) return undefined;
+      const request = message;
 
       const tabId = sender.tab?.id;
       if (tabId == null) return undefined;

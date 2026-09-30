@@ -70,6 +70,33 @@ export function mentionsState(selector: string, states: readonly PseudoState[]):
   return states.filter((state) => new RegExp(`:${state}(?![\\w-])`).test(selector));
 }
 
+/**
+ * Resolve every `url()` in a declaration block against its own stylesheet.
+ *
+ * The copies land in a `<style>` element of ours, and a relative URL in a
+ * `<style>` resolves against the *document*, not the sheet it came from. So
+ * `url(../img/arrow.svg)` from `/css/site.css` would silently become
+ * `/img/arrow.svg` relative to the page: the forced state renders wrong, and
+ * the browser requests a path the page never asked for. Absolute copies keep
+ * both the render and the network behaviour identical to the original.
+ *
+ * Fragment-only URLs (`url(#clip)`) point into the document by definition, and
+ * `data:`/`blob:` carry their own content, so those are left alone.
+ */
+export function absolutizeCssUrls(cssText: string, base: string | null | undefined): string {
+  if (!base || !cssText.includes('url(')) return cssText;
+
+  return cssText.replace(/url\(\s*(['"]?)([^'")]*)\1\s*\)/g, (match, _quote: string, raw: string) => {
+    const value = raw.trim();
+    if (!value || value.startsWith('#') || /^(?:data|blob):/i.test(value)) return match;
+    try {
+      return `url(${JSON.stringify(new URL(value, base).href)})`;
+    } catch {
+      return match;
+    }
+  });
+}
+
 interface CollectResult {
   css: string[];
   found: Set<PseudoState>;
@@ -87,6 +114,7 @@ function collectRules(
   rules: CSSRuleList | undefined,
   states: readonly PseudoState[],
   out: CollectResult,
+  base: string | null,
   depth = 0,
 ): void {
   if (!rules || depth > 8) return;
@@ -99,7 +127,8 @@ function collectRules(
       if (matched.length === 0) continue;
 
       for (const state of matched) out.found.add(state);
-      out.css.push(`${rewriteSelector(style.selectorText, states)} { ${style.style.cssText} }`);
+      const declarations = absolutizeCssUrls(style.style.cssText, base);
+      out.css.push(`${rewriteSelector(style.selectorText, states)} { ${declarations} }`);
       out.ruleCount += 1;
       continue;
     }
@@ -107,7 +136,7 @@ function collectRules(
     const group = rule as CSSGroupingRule & { conditionText?: string; media?: MediaList };
     if (group.cssRules) {
       const nested: CollectResult = { css: [], found: out.found, ruleCount: 0 };
-      collectRules(group.cssRules, states, nested, depth + 1);
+      collectRules(group.cssRules, states, nested, base, depth + 1);
 
       if (nested.css.length > 0) {
         const condition =
@@ -145,7 +174,9 @@ export function createPseudoStateController(doc: Document = document): PseudoSta
 
   for (const sheet of Array.from(doc.styleSheets)) {
     try {
-      collectRules(sheet.cssRules, states, result);
+      // An inline <style> has no href; its URLs already resolve against the
+      // document, which is where the copies will live too.
+      collectRules(sheet.cssRules, states, result, sheet.href ?? doc.baseURI);
     } catch {
       // Cross-origin stylesheet. Its hover rules cannot be forced, and no
       // extension permission changes that.

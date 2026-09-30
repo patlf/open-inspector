@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Open Inspector hostile fixture</title>
+
+    <!--
+      Cross-origin: cross.localhost is a different origin from localhost, and
+      Chrome resolves every *.localhost name to the loopback address the dev
+      server is bound to. Loaded by the page; unreadable by anyone.
+    -->
+    <link rel="stylesheet" href="http://cross.localhost:5178/hostile/cross.css" />
+
+    <!--
+      A page at war with anything injected into it.
+
+      Every one of these would wreck a UI that inherits from the page or sits
+      in its cascade: resets that wipe every property, zero font sizes, forced
+      block display and static positioning, and inherited typography that a
+      :host { all: initial } does not beat when the page says !important.
+      <head> is excluded only so its contents do not render as text.
+    -->
+    <style id="hostile">
+      *:not(head):not(head *):not(script) {
+        all: unset !important;
+      }
+      *:not(head):not(head *):not(script) {
+        display: block !important;
+        position: static !important;
+        font-size: 0 !important;
+        line-height: 0 !important;
+        letter-spacing: 0.6em !important;
+        word-spacing: 2em !important;
+        color: rgba(0, 0, 0, 0) !important;
+        z-index: -1 !important;
+        box-sizing: content-box !important;
+        opacity: 0.99 !important;
+      }
+    </style>
+
+    <!--
+      Opt-in extras, each pinned down by its own test in hostile.spec.ts:
+
+      ?root-transform  a transform on every element, <html> included. A
+                       transformed root is the containing block for
+                       position: fixed, so a fixed panel appended to <html>
+                       shrinks to the page's height.
+      ?inherit         inherited text properties the panel does not reset.
+    -->
+    <script>
+      (() => {
+        const extras = {
+          'root-transform':
+            '*:not(head):not(head *):not(script) { transform: scale(0.98) !important; }',
+          inherit:
+            '*:not(head):not(head *):not(script) { text-transform: uppercase !important; text-align: right !important; cursor: none !important; }',
+        };
+        const wanted = new URLSearchParams(location.search);
+        for (const [name, css] of Object.entries(extras)) {
+          if (!wanted.has(name)) continue;
+          const style = document.createElement('style');
+          style.id = `hostile-${name}`;
+          style.textContent = css;
+          document.head.append(style);
+        }
+      })();
+    </script>
+
+    <!-- The router swaps this one sheet per route; the sheet count never changes. -->
+    <style id="route-style">
+      .title { color: rgb(200, 0, 0) !important; }
+    </style>
+  </head>
+
+  <body>
+    <!--
+      Inline !important is the only thing that beats the reset above, so the
+      elements the tests pin carry their geometry this way.
+    -->
+    <main id="app" style="width: 640px !important; padding: 24px !important;">
+      <h1 class="title" style="height: 40px !important; width: 400px !important; font-size: 20px !important; line-height: 40px !important;">Route A</h1>
+      <p class="hover-me" style="height: 30px !important; width: 400px !important; font-size: 14px !important; line-height: 30px !important;">Styled only from a stylesheet no one can read.</p>
+    </main>
+
+    <nav style="width: 640px !important; padding: 0 24px !important;">
+      <a id="to-b" href="/hostile/route-b" data-route="b" style="height: 30px !important; width: 200px !important; font-size: 14px !important; line-height: 30px !important; color: #000 !important;">Go to route B</a>
+    </nav>
+
+    <section style="width: 640px !important; padding: 0 24px !important;">
+      <page-card id="page-card" style="height: 60px !important; width: 400px !important;"></page-card>
+    </section>
+
+    <input id="page-input" type="text" value="hostile" style="height: 24px !important; width: 200px !important; font-size: 14px !important;" />
+
+    <script>
+      /** A page-owned open shadow root, with styles of its own the page reset cannot reach. */
+      customElements.define(
+        'page-card',
+        class extends HTMLElement {
+          connectedCallback() {
+            if (this.shadowRoot) return;
+            const root = this.attachShadow({ mode: 'open' });
+            root.innerHTML = `
+              <style>
+                .inner { display: block; padding: 12px; font: 14px system-ui; color: rgb(10, 20, 30); background: rgb(230, 240, 250); }
+              </style>
+              <div class="inner" part="inner">Inside the page's own shadow root</div>
+            `;
+          }
+        },
+      );
+
+      /**
+       * A pushState "router", the way single-page apps do it: new URL, new
+       * content, a different stylesheet in the same slot — and no document
+       * load in between, so nothing that caches per page gets told.
+       */
+      const ROUTES = {
+        a: { path: '/hostile.html', title: 'Route A', css: '.title { color: rgb(200, 0, 0) !important; }' },
+        b: {
+          path: '/hostile/route-b',
+          title: 'Route B',
+          css: '.title { color: rgb(0, 0, 200) !important; outline: 3px solid rgb(0, 0, 200) !important; }',
+        },
+      };
+
+      function go(name) {
+        const route = ROUTES[name];
+        history.pushState({ route: name }, '', route.path);
+        document.getElementById('route-style').textContent = route.css;
+        document.querySelector('.title').textContent = route.title;
+      }
+
+      document.addEventListener('click', (event) => {
+        const link = event.target instanceof Element ? event.target.closest('a[data-route]') : null;
+        if (!link) return;
+        event.preventDefault();
+        go(link.getAttribute('data-route'));
+      });
+
+      window.addEventListener('popstate', (event) => go(event.state?.route ?? 'a'));
+    </script>
+  </body>
+</html>

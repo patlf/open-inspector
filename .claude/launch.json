@@ -3,9 +3,21 @@
   "configurations": [
     {
       "name": "site",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["wrangler", "dev", "--port", "8788", "--config", "apps/site/wrangler.jsonc"],
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "scripts/serve-site.mjs"
+      ],
       "port": 8788
+    },
+    {
+      "name": "playground",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@open-inspector/playground",
+        "dev"
+      ],
+      "port": 5178
     }
   ]
 }

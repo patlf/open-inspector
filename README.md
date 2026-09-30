@@ -15,7 +15,7 @@
 [![Network requests](https://img.shields.io/badge/network%20requests-0-3f7d58)](#do-not-take-our-word-for-it)
 [![License](https://img.shields.io/badge/license-MIT-666)](LICENSE)
 
-**[Add to Chrome](https://chromewebstore.google.com/detail/open-inspector/apiiaenebelbejcjpmbcecikmaahpffd)** · [Website](https://open-inspector-site.pattest.workers.dev) · [Privacy](https://open-inspector-site.pattest.workers.dev/privacy)
+**[Add to Chrome](https://chromewebstore.google.com/detail/open-inspector/apiiaenebelbejcjpmbcecikmaahpffd)** · [Website](https://patlf.github.io/open-inspector/) · [Privacy](https://patlf.github.io/open-inspector/privacy/)
 
 </div>
 
@@ -116,7 +116,7 @@ Three properties make that safe on a page you cannot afford to break:
 
 - **Exactly revertible.** Every edit records the element's prior *inline* value **and** its `!important` state, so reverting restores what was there — including a page's own inline styles, which a blanket `style.cssText = ''` would destroy.
 - **Rejected values are reported, not swallowed.** `setProperty` silently ignores anything it cannot parse, so values are checked with `CSS.supports` *before* being written. Checking afterwards cannot work: if the element already had `color: blue` inline, a rejected write leaves `blue` in place, which is indistinguishable from success.
-- **Nothing is persisted.** Closing reverts every edit and removes the `style` attribute it created, down to not leaving an empty `style=""` behind.
+- **Nothing is persisted.** Closing reverts every edit and removes the `style` attribute it created, down to not leaving an empty `style=""` behind. With edits pending, the first close (or <kbd>Esc</kbd>) says how many it will revert and waits for a second one, and the Styles tab carries the count wherever you are in the panel.
 
 ## Known limits
 
@@ -125,7 +125,8 @@ Honest failure beats a confident wrong answer, so the panel reports what it cann
 - **Cross-origin stylesheets cannot be read.** `.cssRules` throws when a stylesheet is served from another origin without CORS headers, and no extension permission changes that — the restriction follows the stylesheet, not the reader. Stripe serves all six of its sheets this way, so Matched Rules is empty there and *says so* rather than claiming nothing matched. DevTools works around this by refetching the CSS over the network; we will not, because that would break the zero-egress promise.
 - **Canvas and WebGL** surfaces have no DOM inside them. Nothing can fix this.
 - **Closed shadow roots** are undetectable by design. An empty custom element that clearly rendered something is flagged as probably hiding one, described as the heuristic it is.
-- **Cross-origin iframes** are unreachable from the parent frame, for every extension.
+- **Iframes are not inspectable yet.** Same-origin frames are reachable in principle but not implemented; cross-origin frames are unreachable from the parent frame, for every extension. Open the frame in its own tab to inspect it.
+- **Asset thumbnails only show what the page already loaded.** An `og:image`, an unused favicon size or a prefetch hint is listed as "not loaded by the page", because rendering it would be a request of ours.
 - **The responsive preview cannot go below the operating system's minimum window width**, roughly 570px on macOS. The panel reports the width actually achieved rather than the one requested.
 - **`color-mix()`, `light-dark()` and relative colour syntax** are refused rather than guessed at. `lab()`, `lch()`, `oklch()` and `oklab()` all parse.
 - **No screenshots, console or network debugging.** Those are separate products.
@@ -153,15 +154,20 @@ pnpm launch         # a disposable browser with the extension already installed
 | `pnpm build` / `pnpm build:firefox` | Production build into `.output/` |
 | `pnpm zip` | Package for the store |
 | `pnpm test` | Unit tests |
+| `pnpm test:browser` | Unit tests that need a real engine, in headless Chromium |
 | `pnpm e2e` | End-to-end: the real extension in a real browser |
 | `pnpm e2e:headed` | Same, with a visible window |
 | `pnpm typecheck` | Project-wide typecheck |
 | `pnpm check:egress` | The zero-egress guard |
 | `pnpm check:size` | Bundle budgets, gzipped |
-| `pnpm check:site` | The website's own contrast and image-ratio checks |
+| `pnpm site:dev` | Serve the website locally on :8788, as GitHub Pages will |
+| `pnpm check:site` | The website's own contrast and image-ratio checks (needs `site:dev`) |
 | `pnpm sweep` | Run the engine against real production sites |
 | `pnpm verify` | Typecheck, lint, unit tests, egress guard |
 | `pnpm gen:icons` / `gen:promo` / `gen:shots` | Regenerate icons, store promo images, screenshots |
+| `pnpm gen:store` | Chrome Web Store screenshots and the Product Hunt gallery (needs `build` and `site:dev`) |
+
+Screenshot framing uses shotkit, a separate tool that is not a dependency (and not public yet): clone it next to this repo (`../shotkit`) or point `SHOTKIT_HOME` at a checkout. Nothing else needs it.
 
 </details>
 

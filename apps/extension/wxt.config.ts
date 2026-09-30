@@ -45,7 +45,6 @@ export default defineConfig({
     name: 'Open Inspector',
     description:
       'Inspect layout, styles and design tokens on any page. Free, open source, and never sends anything anywhere.',
-    version: '0.0.1',
     permissions: ['activeTab', 'scripting'],
     action: {
       default_title: 'Inspect this page (Alt+Shift+I)',
@@ -62,6 +61,13 @@ export default defineConfig({
       gecko: {
         id: 'open-inspector@openinspector.dev',
         strict_min_version: '115.0',
+        /*
+         * Firefox's own declaration of what an add-on collects, shown at
+         * install time and soon required by AMO. "none" is the whole point of
+         * this project, so it is stated where the browser will show it.
+         * Spread in because WXT's manifest types predate the key.
+         */
+        ...({ data_collection_permissions: { required: ['none'] } } as object),
       },
     },
   },

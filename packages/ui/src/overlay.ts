@@ -1,3 +1,4 @@
+import { lockHost, raiseToTopLayer } from './host.js';
 import type { BoxModel, EdgeSizes, ProbeBoundary, Rect } from '@open-inspector/core';
 import { isEmptyRect } from '@open-inspector/core';
 import { placeChip } from './chip-placement.js';
@@ -68,9 +69,7 @@ function lockHostGeometry(host: HTMLElement): void {
     visibility: 'visible',
   };
 
-  for (const [property, value] of Object.entries(rules)) {
-    host.style.setProperty(property, value, 'important');
-  }
+  lockHost(host, rules);
 }
 
 function applyStyles(shadow: ShadowRoot): void {
@@ -155,7 +154,16 @@ function boundaryNote(boundary: ProbeBoundary | null | undefined): string {
  * is a custom tag with `pointer-events: none`, so it is invisible to the page's
  * own hit-testing as well as to ours.
  */
-export function createOverlay(doc: Document = document): Overlay {
+export interface OverlayOptions {
+  /**
+   * Called after the host is (re)inserted into the top layer. The newest
+   * top-layer element paints above the rest, so the panel uses this to put
+   * itself back above the highlight.
+   */
+  onAttach?: () => void;
+}
+
+export function createOverlay(doc: Document = document, options: OverlayOptions = {}): Overlay {
   const host = doc.createElement(HOST_TAG);
   host.setAttribute('aria-hidden', 'true');
   lockHostGeometry(host as HTMLElement);
@@ -194,6 +202,8 @@ export function createOverlay(doc: Document = document): Overlay {
     if (!attached || !host.isConnected) {
       doc.documentElement.appendChild(host);
       attached = true;
+      raiseToTopLayer(host as HTMLElement);
+      options.onAttach?.();
     }
   }
 

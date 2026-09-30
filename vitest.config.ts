@@ -8,6 +8,8 @@ export default defineConfig({
   test: {
     environment: 'happy-dom',
     include: ['packages/*/src/**/*.test.ts'],
+    // Real-browser tests run under vitest.browser.config.ts.
+    exclude: ['**/node_modules/**', 'packages/*/src/**/*.browser.test.ts'],
     coverage: {
       provider: 'v8',
       include: ['packages/*/src/**/*.ts'],

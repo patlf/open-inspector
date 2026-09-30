@@ -19,3 +19,13 @@ SOURCE-OF-TRUTH.md
 # publishing it here would put someone else's work under this repo's licence.
 # .claude/launch.json stays tracked — that one is real project config.
 .claude/skills/
+
+# Wrangler scratch output. Was tracked by accident in 0.0.1.
+.wrangler/
+
+# Launch plan. Same reasoning as SOURCE-OF-TRUTH.md.
+LAUNCH-PLAN.md
+
+# Launch-day copy and schedule. Same reasoning as LAUNCH-PLAN.md; the gallery
+# images and their template next to it are public.
+store/launch/LAUNCH.md

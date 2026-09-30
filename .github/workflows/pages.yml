@@ -1,0 +1,73 @@
+name: Site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/site/public/**'
+      - 'scripts/serve-site.mjs'
+      - 'scripts/check-site-*.mjs'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  # The site makes the same accessibility claim the extension does, so it is
+  # held to it before it goes out: every text sample on both themes meets AA,
+  # and every image is the size it is displayed at.
+  check:
+    name: Check site
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Contrast and image checks
+        run: |
+          node scripts/serve-site.mjs &
+          for i in $(seq 30); do curl -fs http://localhost:8788/ >/dev/null && break; sleep 1; done
+          node scripts/check-site-contrast.mjs
+          node scripts/check-site-images.mjs
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: check
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The site is static files with no build step, so there is nothing to
+      # install: what is in the repository is exactly what gets served.
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/site/public
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
