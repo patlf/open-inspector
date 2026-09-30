@@ -226,6 +226,9 @@ code {
 }
 
 .top nav {
+  /* Pushed right, next to the install button, rather than centred between it
+     and the brand. */
+  margin-left: auto;
   display: flex;
   flex-wrap: wrap;
   gap: var(--s2) var(--s3);
@@ -347,7 +350,7 @@ h1 em { font-style: normal; color: var(--accent); }
   text-decoration: none;
 }
 
-/* The Chrome mark is full colour, so it never inherits the button's ink. */
+/* The extension mark is drawn in currentColor, so it follows the button's ink. */
 .btn-mark { display: block; flex: none; }
 @media (prefers-color-scheme: dark) { .btn { color: #14181c; } }
 .btn:hover { filter: brightness(1.08); }
@@ -356,6 +359,15 @@ h1 em { font-style: normal; color: var(--accent); }
 .btn.ghost:hover { background: var(--accent-wash); filter: none; }
 
 .note { font-family: var(--mono); font-size: var(--t-1); color: var(--ink-mute); }
+
+/* Most of the audience is not on Chrome itself; say where it runs. */
+.browsers { margin: var(--s2) 0 0; font-size: var(--t-1); color: var(--ink-mute); }
+
+/* The header's install button: the same button, sized to sit in a nav row. */
+.btn-small { padding: 7px 12px; gap: 7px; font-size: var(--t-1); }
+/* On a phone the hero's button is one screen below, and nothing installs
+   there anyway; a third header row would only push the page down. */
+@media (max-width: 640px) { .top .btn-small { display: none; } }
 
 /* ---------- sections ---------- */
 
