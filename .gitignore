@@ -29,3 +29,9 @@ LAUNCH-PLAN.md
 # Launch-day copy and schedule. Same reasoning as LAUNCH-PLAN.md; the gallery
 # images and their template next to it are public.
 store/launch/LAUNCH.md
+
+# Internal working notes, kept on disk for the people and agents working on the
+# project: the design brief (it discusses competitors by name) and the Web Store
+# dashboard checklist.
+PRODUCT.md
+store/SUBMISSION.md
