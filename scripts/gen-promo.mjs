@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Render the Chrome Web Store promotional images.
+ * Render the Chrome Web Store small promo tile. (The marquee is a slide in
+ * store/launch/src/launch.html, rendered by gen-launch-media.mjs.)
  *
  * Generated rather than hand-designed for the same reason the icons are: a
  * binary you cannot diff is a small supply-chain smell in a project whose whole
@@ -32,7 +33,6 @@ mkdirSync(OUT, { recursive: true });
 
 const TARGETS = [
   { name: 'small-tile-440x280', file: 'promo-small.html', width: 440, height: 280 },
-  { name: 'marquee-1400x560', file: 'promo-marquee.html', width: 1400, height: 560 },
 ];
 
 const browser = await chromium.launch();

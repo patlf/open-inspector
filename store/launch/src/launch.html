@@ -84,9 +84,89 @@
   .verify { align-content: center; gap: 52px; padding: 0 84px; }
   .verify .nums { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; }
   .num { border: 1px solid var(--rule); border-radius: 14px; padding: 30px 28px; display: flex; flex-direction: column; gap: 10px; }
-  .num b { font-family: var(--mono); font-size: 64px; font-weight: 600; letter-spacing: -0.04em; color: var(--good); line-height: 1; }
+  .num b { font-family: var(--mono); font-size: 56px; font-weight: 600; letter-spacing: -0.04em; color: var(--good); line-height: 1; }
   .num span { font-family: var(--mono); font-size: 16px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink); }
   .num p { font-size: 16px; line-height: 1.5; color: var(--ink-mute); }
+
+  /*
+   * Feature slides: one claim per image, the real panel, and the part of it
+   * that proves the claim pulled out at readable size.
+   *
+   * The call-outs are crops of the same screenshots, not redrawn UI, so they
+   * cannot drift from the product: `pnpm gen:shots` updates both at once.
+   * Each crop is given in the shot's own pixels (--x --y --w --h, at 3x) and
+   * drawn at --k of that size.
+   */
+  .feat {
+    grid-template-columns: 500px 1fr;
+    grid-template-rows: 1fr auto;
+    column-gap: 36px;
+    padding: 0 0 0 76px;
+    background:
+      radial-gradient(640px 520px at 78% 46%, rgba(228,116,63,0.13), transparent 70%),
+      var(--bg);
+  }
+  .feat .copy { align-self: center; gap: 22px; }
+  .feat h2 { font-size: 52px; }
+  .feat .sub { font-size: 21px; max-width: 30ch; }
+  .points { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+  .points li { display: flex; gap: 12px; align-items: baseline; font-size: 19px; line-height: 1.4; color: var(--ink); }
+  .points li::before {
+    content: ''; flex: none; width: 16px; height: 9px; margin-bottom: 3px;
+    border-left: 2.5px solid var(--good); border-bottom: 2.5px solid var(--good);
+    transform: rotate(-45deg) translateY(-3px);
+  }
+  .stage { position: relative; height: 100%; overflow: hidden; }
+  /* The panel itself, cropped out of its backdrop and run off the bottom
+     edge, so it reads as a window on a page rather than a picture of one. */
+  .stage .panel {
+    --k: 0.45;
+    position: absolute; top: 56px; right: 44px; bottom: 0;
+    width: calc(1040px * var(--k));
+    background-image: var(--src);
+    background-repeat: no-repeat;
+    background-size: calc(1224px * var(--k)) auto;
+    background-position: calc(-92px * var(--k)) calc(-92px * var(--k));
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 40px 90px -30px rgba(0,0,0,0.9);
+  }
+  .callout {
+    --k: 0.5;
+    position: absolute;
+    width: calc(var(--w) * var(--k) * 1px);
+    height: calc(var(--h) * var(--k) * 1px);
+    background-image: var(--src);
+    background-repeat: no-repeat;
+    background-size: calc(1224px * var(--k)) auto;
+    background-position: calc(var(--x) * var(--k) * -1px) calc(var(--y) * var(--k) * -1px);
+    border-radius: 12px;
+    outline: 1.5px solid rgba(228,116,63,0.75);
+    outline-offset: 5px;
+    box-shadow: 0 30px 70px -18px rgba(0,0,0,0.95), 0 0 0 6px #14181c;
+  }
+  .strip {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; gap: 14px;
+    padding: 18px 76px 22px 0;
+    border-top: 1px solid var(--rule);
+    background: var(--bg);
+    position: relative; z-index: 1;
+    font-family: var(--mono); font-size: 14px; color: var(--ink-mute);
+  }
+  .strip b { color: var(--ink); font-weight: 600; font-size: 16px; letter-spacing: -0.02em; }
+  .strip .sep { margin-left: auto; }
+  .strip .ok { color: var(--good); }
+.marquee {
+    grid-template-columns: 1fr 640px;
+    padding-left: 76px;
+    background:
+      radial-gradient(560px 420px at 80% 50%, rgba(228,116,63,0.14), transparent 70%),
+      var(--bg);
+  }
+  .marquee .copy { align-self: center; gap: 22px; }
+  .marquee h1 { font-size: 46px; }
+  .marquee .sub { font-size: 19px; max-width: 44ch; }
+  .marquee .stage .panel { top: 40px; right: 40px; --k: 0.42; }
 </style>
 </head>
 <body>
@@ -148,35 +228,93 @@
   </div>
 </section>
 
-<!-- 3. The features nothing else in the category has. -->
-<section class="slide split" data-s="layout">
+<!-- 3. One feature per image, each with the part that proves it enlarged. -->
+<section class="slide feat" data-s="styles">
   <div class="copy">
-    <span class="kicker">Layout &amp; type</span>
-    <h2>See how the page is <em>really</em> built.</h2>
-    <p class="sub">Grid and flex anatomy, the spacing scale it actually follows, and the font that rendered, not the one that was asked for.</p>
+    <span class="kicker">Styles</span>
+    <h2>Every value, <em>one hover away.</em></h2>
+    <p class="sub">Point at anything and read the box model, the spacing and the rules that won.</p>
+    <ul class="points"><li>Matched rules, losers struck through</li><li>Edit any value live, revert exactly</li><li>Force :hover, :focus and five more</li></ul>
   </div>
-  <div class="pair">
-    <img class="shot" src="../../../apps/site/public/shots/panel-layout-dark.png" alt="">
-    <img class="shot" src="../../../apps/site/public/shots/panel-type-dark.png" alt="">
+  <div class="stage">
+    <div class="panel" style="--src:url(../../../apps/site/public/shots/panel-styles-dark.png)"></div>
+    <div class="callout" style="--src:url(../../../apps/site/public/shots/panel-styles-dark.png); --x:230; --y:430; --w:890; --h:455; left:30px; top:300px;"></div>
   </div>
+  <div class="strip"><svg width="20" height="20"><use href="#mark"/></svg><b>Open Inspector</b><span class="sep"><span class="ok">No site access</span> · <span class="ok">No network requests</span> · Free &amp; open source</span></div>
 </section>
 
-<section class="slide split" data-s="color">
+<section class="slide feat" data-s="layout">
+  <div class="copy">
+    <span class="kicker">Layout</span>
+    <h2>See how the page is <em>really</em> built.</h2>
+    <p class="sub">How an element lays out its children, and the spacing scale the page actually follows.</p>
+    <ul class="points"><li>Grid and flex anatomy in plain words</li><li>Spacing scale detected, outliers named</li><li>Breakpoints that affect this element</li></ul>
+  </div>
+  <div class="stage">
+    <div class="panel" style="--src:url(../../../apps/site/public/shots/panel-layout-dark.png)"></div>
+    <div class="callout" style="--src:url(../../../apps/site/public/shots/panel-layout-dark.png); --x:230; --y:990; --w:890; --h:420; left:30px; top:330px;"></div>
+  </div>
+  <div class="strip"><svg width="20" height="20"><use href="#mark"/></svg><b>Open Inspector</b><span class="sep"><span class="ok">No site access</span> · <span class="ok">No network requests</span> · Free &amp; open source</span></div>
+</section>
+
+<section class="slide feat" data-s="color">
   <div class="copy">
     <span class="kicker">Color</span>
-    <h2>Whether anyone can <em>actually read it.</em></h2>
-    <p class="sub">Live WCAG grading with the nearest passing colour, a page-wide contrast audit, and a palette clustered in OKLab.</p>
+    <h2>Contrast, checked across <em>the whole page.</em></h2>
+    <p class="sub">Live WCAG grading for the element under the pointer, and an audit that finds every failing sample.</p>
+    <ul class="points"><li>AA and AAA, normal and large text</li><li>Jump straight to each failure</li><li>Eyedropper and a clustered palette</li></ul>
   </div>
-  <div class="single"><img class="shot" src="../../../apps/site/public/shots/panel-color-dark.png" alt=""></div>
+  <div class="stage">
+    <div class="panel" style="--src:url(../../../apps/site/public/shots/panel-color-dark.png)"></div>
+    <div class="callout" style="--src:url(../../../apps/site/public/shots/panel-color-dark.png); --x:230; --y:640; --w:890; --h:220; left:10px; top:150px;"></div><div class="callout" style="--src:url(../../../apps/site/public/shots/panel-color-dark.png); --x:230; --y:1220; --w:890; --h:360; left:60px; top:420px;"></div>
+  </div>
+  <div class="strip"><svg width="20" height="20"><use href="#mark"/></svg><b>Open Inspector</b><span class="sep"><span class="ok">No site access</span> · <span class="ok">No network requests</span> · Free &amp; open source</span></div>
 </section>
 
-<section class="slide split" data-s="export">
+<section class="slide feat" data-s="type">
+  <div class="copy">
+    <span class="kicker">Type</span>
+    <h2>The font that <em>actually</em> rendered.</h2>
+    <p class="sub">Measured on a canvas, not read off the font stack, with the full metrics beside it.</p>
+    <ul class="points"><li>Rendered family, not just the stack</li><li>Size, weight, line height, tracking</li><li>The page's modular type scale</li></ul>
+  </div>
+  <div class="stage">
+    <div class="panel" style="--src:url(../../../apps/site/public/shots/panel-type-dark.png)"></div>
+    <div class="callout" style="--src:url(../../../apps/site/public/shots/panel-type-dark.png); --x:230; --y:430; --w:890; --h:340; left:30px; top:320px;"></div>
+  </div>
+  <div class="strip"><svg width="20" height="20"><use href="#mark"/></svg><b>Open Inspector</b><span class="sep"><span class="ok">No site access</span> · <span class="ok">No network requests</span> · Free &amp; open source</span></div>
+</section>
+
+<section class="slide feat" data-s="export">
   <div class="copy">
     <span class="kicker">Export</span>
     <h2>Take the design system <em>with you.</em></h2>
-    <p class="sub">CSS variables, SCSS, Tailwind, JSON, W3C design tokens, and a Markdown handoff written for Cursor or Claude.</p>
+    <p class="sub">The page's colours, type and spacing as tokens, ready to paste.</p>
+    <ul class="points"><li>CSS variables, SCSS and Tailwind</li><li>JSON and W3C design tokens</li><li>A handoff written for Cursor or Claude</li></ul>
   </div>
-  <div class="single"><img class="shot" src="../../../apps/site/public/shots/panel-export-dark.png" alt=""></div>
+  <div class="stage">
+    <div class="panel" style="--src:url(../../../apps/site/public/shots/panel-export-dark.png)"></div>
+    <div class="callout" style="--src:url(../../../apps/site/public/shots/panel-export-dark.png); --x:250; --y:895; --w:860; --h:470; left:30px; top:300px;"></div>
+  </div>
+  <div class="strip"><svg width="20" height="20"><use href="#mark"/></svg><b>Open Inspector</b><span class="sep"><span class="ok">No site access</span> · <span class="ok">No network requests</span> · Free &amp; open source</span></div>
+</section>
+
+<!-- The store's marquee tile, 1400×560: only shown if Google features it. -->
+<section class="slide marquee" data-s="marquee">
+  <div class="copy">
+    <div class="brand"><svg width="28" height="28"><use href="#mark"/></svg><span>Open Inspector</span></div>
+    <h1>Inspect any page.<br><em>No site access requested.</em></h1>
+    <p class="sub">Layout, styles, colour, type, assets and design tokens, from an extension that asks for nothing and sends nothing.</p>
+    <div class="facts">
+      <span class="fact good">0 host permissions</span>
+      <span class="fact good">0 network requests</span>
+      <span class="fact">Free &amp; MIT</span>
+    </div>
+  </div>
+  <div class="stage">
+    <div class="panel" style="--src:url(../../../apps/site/public/shots/panel-styles-dark.png)"></div>
+    <div class="callout" style="--src:url(../../../apps/site/public/shots/panel-styles-dark.png); --x:230; --y:430; --w:890; --h:455; --k:0.46; left:0px; top:250px;"></div>
+  </div>
 </section>
 
 <!-- 5. Proof. -->
@@ -188,7 +326,7 @@
   <div class="nums">
     <div class="num"><b>0</b><span>host permissions</span><p>Chrome's own install screen says so.</p></div>
     <div class="num"><b>0</b><span>network requests</span><p>No fetch, XHR, WebSocket or beacon, scanned on every build.</p></div>
-    <div class="num"><b>946</b><span>tests</span><p>Including end-to-end runs of the real packaged extension.</p></div>
+    <div class="num"><b>1,000+</b><span>tests</span><p>Including end-to-end runs of the real packaged extension.</p></div>
     <div class="num"><b>MIT</b><span>licensed</span><p>Read all of it on GitHub. No account, no telemetry.</p></div>
   </div>
 </section>
