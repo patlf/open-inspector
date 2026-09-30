@@ -116,11 +116,12 @@
     border-left: 2.5px solid var(--good); border-bottom: 2.5px solid var(--good);
     transform: rotate(-45deg) translateY(-3px);
   }
-  .stage { position: relative; height: 100%; overflow: hidden; }
+  .stage { position: relative; height: 100%; }
   /* The panel itself, cropped out of its backdrop and run off the bottom
      edge, so it reads as a window on a page rather than a picture of one. */
   .stage .panel {
     --k: 0.45;
+    overflow: hidden;
     position: absolute; top: 56px; right: 44px; bottom: 0;
     width: calc(1040px * var(--k));
     background-image: var(--src);
@@ -129,20 +130,43 @@
     background-position: calc(-92px * var(--k)) calc(-92px * var(--k));
     border-radius: 14px 14px 0 0;
     box-shadow: 0 40px 90px -30px rgba(0,0,0,0.9);
+    /*
+     * Faded out before its lower sections, so the call-out beside it is the
+     * only place they appear. --fade is how much of the bottom to lose; a
+     * slide whose detail comes from further down than the crop sets it to 0.
+     */
+    --fade: 190px;
+    -webkit-mask-image: linear-gradient(#000 calc(100% - var(--fade)), transparent calc(100% - var(--fade) * 0.25));
+    mask-image: linear-gradient(#000 calc(100% - var(--fade)), transparent calc(100% - var(--fade) * 0.25));
   }
-  .callout {
-    --k: 0.5;
+  /*
+   * A detail the panel beside it does not show: a section further down, a
+   * second format, or the highlight on the page itself. Captured from the
+   * real extension by scripts/gen-launch-details.mjs.
+   */
+  .detail {
     position: absolute;
-    width: calc(var(--w) * var(--k) * 1px);
-    height: calc(var(--h) * var(--k) * 1px);
-    background-image: var(--src);
-    background-repeat: no-repeat;
-    background-size: calc(1224px * var(--k)) auto;
-    background-position: calc(var(--x) * var(--k) * -1px) calc(var(--y) * var(--k) * -1px);
     border-radius: 12px;
+    overflow: hidden;
     outline: 1.5px solid rgba(228,116,63,0.75);
     outline-offset: 5px;
     box-shadow: 0 30px 70px -18px rgba(0,0,0,0.95), 0 0 0 6px #14181c;
+  }
+  .detail img { display: block; width: 100%; }
+  /* Code runs on past the crop; end it in the panel's own colour rather than
+     cutting a line in half. */
+  .detail.fade::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 70px;
+    background: linear-gradient(rgba(21,25,29,0), #15191d 80%);
+  }
+  /* Solid, because it often sits over the panel and must read over anything. */
+  .detail-label {
+    position: absolute;
+    padding: 5px 9px;
+    border-radius: 5px;
+    background: #14181c;
+    font-family: var(--mono); font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--accent);
   }
   .strip {
     grid-column: 1 / -1;
@@ -237,8 +261,8 @@
     <ul class="points"><li>Matched rules, losers struck through</li><li>Edit any value live, revert exactly</li><li>Force :hover, :focus and five more</li></ul>
   </div>
   <div class="stage">
-    <div class="panel" style="--src:url(../../../apps/site/public/shots/panel-styles-dark.png)"></div>
-    <div class="callout" style="--src:url(../../../apps/site/public/shots/panel-styles-dark.png); --x:230; --y:430; --w:890; --h:455; left:30px; top:300px;"></div>
+    <div class="panel" style="--src:url(../../../apps/site/public/shots/panel-styles-dark.png); --fade:0px"></div>
+    <div class="detail" style="left:0px; top:300px; width:340px;"><img src="details/page-card.png" alt=""></div><span class="detail-label" style="left:-2px; top:258px;">On the page</span>
   </div>
   <div class="strip"><svg width="20" height="20"><use href="#mark"/></svg><b>Open Inspector</b><span class="sep"><span class="ok">No site access</span> · <span class="ok">No network requests</span> · Free &amp; open source</span></div>
 </section>
@@ -252,7 +276,7 @@
   </div>
   <div class="stage">
     <div class="panel" style="--src:url(../../../apps/site/public/shots/panel-layout-dark.png)"></div>
-    <div class="callout" style="--src:url(../../../apps/site/public/shots/panel-layout-dark.png); --x:230; --y:990; --w:890; --h:420; left:30px; top:330px;"></div>
+    <div class="detail" style="left:0px; top:440px; width:360px;"><img src="details/layout-breakpoints.png" alt=""></div><span class="detail-label" style="left:-2px; top:398px;">Breakpoints it responds to</span>
   </div>
   <div class="strip"><svg width="20" height="20"><use href="#mark"/></svg><b>Open Inspector</b><span class="sep"><span class="ok">No site access</span> · <span class="ok">No network requests</span> · Free &amp; open source</span></div>
 </section>
@@ -265,8 +289,8 @@
     <ul class="points"><li>AA and AAA, normal and large text</li><li>Jump straight to each failure</li><li>Eyedropper and a clustered palette</li></ul>
   </div>
   <div class="stage">
-    <div class="panel" style="--src:url(../../../apps/site/public/shots/panel-color-dark.png)"></div>
-    <div class="callout" style="--src:url(../../../apps/site/public/shots/panel-color-dark.png); --x:230; --y:640; --w:890; --h:220; left:10px; top:150px;"></div><div class="callout" style="--src:url(../../../apps/site/public/shots/panel-color-dark.png); --x:230; --y:1220; --w:890; --h:360; left:60px; top:420px;"></div>
+    <div class="panel" style="--src:url(../../../apps/site/public/shots/panel-color-dark.png); --fade:0px"></div>
+    <div class="detail" style="left:0px; top:410px; width:320px;"><img src="details/color-palette.png" alt=""></div><span class="detail-label" style="left:-2px; top:368px;">The page's real palette</span>
   </div>
   <div class="strip"><svg width="20" height="20"><use href="#mark"/></svg><b>Open Inspector</b><span class="sep"><span class="ok">No site access</span> · <span class="ok">No network requests</span> · Free &amp; open source</span></div>
 </section>
@@ -280,7 +304,7 @@
   </div>
   <div class="stage">
     <div class="panel" style="--src:url(../../../apps/site/public/shots/panel-type-dark.png)"></div>
-    <div class="callout" style="--src:url(../../../apps/site/public/shots/panel-type-dark.png); --x:230; --y:430; --w:890; --h:340; left:30px; top:320px;"></div>
+    <div class="detail" style="left:0px; top:460px; width:380px;"><img src="details/type-scale.png" alt=""></div><span class="detail-label" style="left:-2px; top:418px;">The page's type scale</span>
   </div>
   <div class="strip"><svg width="20" height="20"><use href="#mark"/></svg><b>Open Inspector</b><span class="sep"><span class="ok">No site access</span> · <span class="ok">No network requests</span> · Free &amp; open source</span></div>
 </section>
@@ -293,8 +317,8 @@
     <ul class="points"><li>CSS variables, SCSS and Tailwind</li><li>JSON and W3C design tokens</li><li>A handoff written for Cursor or Claude</li></ul>
   </div>
   <div class="stage">
-    <div class="panel" style="--src:url(../../../apps/site/public/shots/panel-export-dark.png)"></div>
-    <div class="callout" style="--src:url(../../../apps/site/public/shots/panel-export-dark.png); --x:250; --y:895; --w:860; --h:470; left:30px; top:300px;"></div>
+    <div class="panel" style="--src:url(../../../apps/site/public/shots/panel-export-dark.png); --fade:0px"></div>
+    <div class="detail fade" style="left:0px; top:390px; width:330px;"><img src="details/export-tailwind.png" alt=""></div><span class="detail-label" style="left:-2px; top:348px;">Or as Tailwind</span>
   </div>
   <div class="strip"><svg width="20" height="20"><use href="#mark"/></svg><b>Open Inspector</b><span class="sep"><span class="ok">No site access</span> · <span class="ok">No network requests</span> · Free &amp; open source</span></div>
 </section>
@@ -313,7 +337,7 @@
   </div>
   <div class="stage">
     <div class="panel" style="--src:url(../../../apps/site/public/shots/panel-styles-dark.png)"></div>
-    <div class="callout" style="--src:url(../../../apps/site/public/shots/panel-styles-dark.png); --x:230; --y:430; --w:890; --h:455; --k:0.46; left:0px; top:250px;"></div>
+    <div class="detail" style="left:40px; top:120px; width:280px;"><img src="details/page-card.png" alt=""></div>
   </div>
 </section>
 

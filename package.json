@@ -27,7 +27,7 @@
     "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm check:egress",
     "sweep": "node scripts/reliability-sweep.mjs",
     "gen:promo": "node scripts/gen-promo.mjs store/promo/src",
-    "gen:store": "node scripts/gen-launch-media.mjs",
+    "gen:store": "node scripts/gen-launch-details.mjs && node scripts/gen-launch-media.mjs",
     "site:dev": "node scripts/serve-site.mjs",
     "check:site": "node scripts/check-site-contrast.mjs && node scripts/check-site-images.mjs && pnpm check:shots",
     "gen:shots": "node scripts/gen-site-shots.mjs && node scripts/gen-site-shots.mjs dark && node scripts/frame-site-shots.mjs && pnpm shots:optimize",
