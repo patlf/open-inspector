@@ -83,10 +83,9 @@ async function openTab(id) {
  * One section of the panel, by its title.
  *
  * Starts just above the title, not at the section's box, which also holds the
- * divider from the section before. Ends at `until` (the bottom of the first
- * matching element) when given, so a crop never stops halfway through a rule.
+ * divider from the section before.
  */
-async function group(title, name, { maxHeight = 1000, until } = {}) {
+async function group(title, name, { maxHeight = 1000 } = {}) {
   const section = page
     .locator('open-inspector-panel .group')
     .filter({ has: page.locator('.group-title', { hasText: new RegExp(`^${title}`) }) })
@@ -97,12 +96,7 @@ async function group(title, name, { maxHeight = 1000, until } = {}) {
   const heading = await section.locator('.group-title').boundingBox();
   if (!box || !heading) throw new Error(`no "${title}" section`);
 
-  let bottom = Math.min(box.y + box.height, heading.y + maxHeight);
-  if (until) {
-    const end = await section.locator(until.selector, { hasText: until.text }).first().boundingBox();
-    if (end) bottom = end.y + end.height;
-  }
-
+  const bottom = Math.min(box.y + box.height, heading.y + maxHeight);
   // Tight enough to leave out the divider above and the panel's own edge.
   const pad = 9;
   await page.screenshot({
@@ -134,14 +128,9 @@ async function onPage(selector, name) {
   console.warn(`  ${name}.png`);
 }
 
-// Styles: the highlight on the page, and a cascade with a loser in it.
+// Styles: the highlight and size chip on the page itself.
 await pick('.card');
 await onPage('.card', 'page-card');
-await pick('.btn.ghost');
-// Ends after `.btn.ghost`, the rule that beat `.btn` — the struck line above it.
-await group('Matched rules', 'styles-rules', {
-  until: { selector: '.rule-block', text: '.btn.ghost' },
-});
 
 // Layout: what the viewport presets exist to test.
 await pick('.card');
