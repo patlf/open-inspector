@@ -86,3 +86,34 @@ export function isInspectorMessage(value: unknown): value is InspectorMessage {
   const type = (value as { type?: unknown }).type;
   return type === PING || type === TOGGLE || type === SAVE || type === RESIZE;
 }
+
+/**
+ * Schemes a save may hand to the page's main world.
+ *
+ * The href is run as an anchor click in the page, so a `javascript:` URL
+ * arriving here would be code execution in the page's own origin. Only the
+ * shapes an asset can actually take are allowed through.
+ */
+const SAVEABLE_SCHEMES = new Set(['http:', 'https:', 'data:', 'blob:']);
+
+export function isSaveMessage(value: unknown): value is SaveMessage {
+  if (typeof value !== 'object' || value === null) return false;
+  const message = value as Partial<SaveMessage>;
+  if (message.type !== SAVE) return false;
+  if (typeof message.href !== 'string' || typeof message.filename !== 'string') return false;
+  try {
+    return SAVEABLE_SCHEMES.has(new URL(message.href).protocol);
+  } catch {
+    return false;
+  }
+}
+
+export function isResizeMessage(value: unknown): value is ResizeMessage {
+  if (typeof value !== 'object' || value === null) return false;
+  const message = value as Partial<ResizeMessage>;
+  if (message.type !== RESIZE) return false;
+  const width = message.viewportWidth;
+  const widthOk = width === null || (typeof width === 'number' && Number.isFinite(width) && width > 0);
+  const inner = message.innerWidth;
+  return widthOk && typeof inner === 'number' && Number.isFinite(inner) && inner > 0;
+}

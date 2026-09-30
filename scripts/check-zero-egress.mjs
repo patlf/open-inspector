@@ -9,7 +9,7 @@
  *
  * Three independent checks:
  *   1. Our own source contains no network API usage.
- *   2. The generated manifest requests no host access.
+ *   2. The generated manifest requests nothing beyond activeTab + scripting.
  *   3. The shipped bundles contain no network API usage either — which also
  *      covers anything a dependency might have dragged in.
  *
@@ -34,18 +34,43 @@ const SKIP_DIRS = new Set(['node_modules', 'dist', '.output', '.wxt', 'coverage'
  */
 const NETWORK_PATTERNS = [
   { name: 'fetch()', pattern: /\bfetch\s*\(/ },
+  // Aliasing gets past a call-shaped pattern (`const f = fetch; f(url)`), so a
+  // bare reference in value position counts too.
+  { name: 'fetch reference', pattern: /(?:[=(,:?]|\breturn)\s*(?:globalThis\.|window\.|self\.)?fetch\b(?!\s*\()/ },
   { name: 'XMLHttpRequest', pattern: /\bXMLHttpRequest\b/ },
   { name: 'WebSocket', pattern: /\bnew\s+WebSocket\b/ },
   { name: 'EventSource', pattern: /\bnew\s+EventSource\b/ },
   { name: 'navigator.sendBeacon', pattern: /\bsendBeacon\s*\(/ },
   { name: 'dynamic remote import', pattern: /\bimport\s*\(\s*['"`]https?:/ },
+  { name: 'WebTransport', pattern: /\bnew\s+WebTransport\b/ },
+  { name: 'RTCPeerConnection', pattern: /\bRTCPeerConnection\b/ },
+  { name: 'new Image()', pattern: /\bnew\s+Image\s*\(/ },
+  { name: 'window.open()', pattern: /\bwindow\.open\s*\(/ },
 ];
 
-/** Manifest keys that would grant access we have promised not to take. */
-const FORBIDDEN_MANIFEST_KEYS = ['host_permissions', 'externally_connectable'];
+/**
+ * Manifest keys that would grant access we have promised not to take.
+ *
+ * The `optional_*` keys matter as much as the required ones: they let a later
+ * version ask at run time for exactly what the install screen said it would
+ * never need.
+ */
+const FORBIDDEN_MANIFEST_KEYS = [
+  'host_permissions',
+  'optional_permissions',
+  'optional_host_permissions',
+  'externally_connectable',
+  'web_accessible_resources',
+];
 
-/** Permissions that would let the extension reach past the active tab. */
-const FORBIDDEN_PERMISSIONS = new Set(['<all_urls>', 'tabs', 'webRequest', 'proxy', 'cookies']);
+/**
+ * The complete list of permissions this extension may request.
+ *
+ * An allowlist, not a denylist: a denylist is only as good as the day it was
+ * written, and Chrome keeps adding permissions. Anything new has to be added
+ * here, in review, on purpose.
+ */
+const ALLOWED_PERMISSIONS = new Set(['activeTab', 'scripting']);
 
 const violations = [];
 
@@ -122,8 +147,8 @@ async function checkManifests() {
     }
 
     for (const permission of manifest.permissions ?? []) {
-      if (FORBIDDEN_PERMISSIONS.has(permission)) {
-        record(relativePath, `manifest requests permission "${permission}"`);
+      if (!ALLOWED_PERMISSIONS.has(permission)) {
+        record(relativePath, `manifest requests permission "${permission}", which is not on the allowlist`);
       }
     }
 

@@ -8,17 +8,33 @@
       name="description"
       content="A free, open-source browser extension that inspects layout, styles, colour, type and assets on any page — and requests no access to your data. No host permissions, no network requests, no account."
     />
-    <link rel="icon" href="/favicon.svg?v=2" type="image/svg+xml" />
-    <link rel="alternate icon" href="/favicon-32.png?v=2" sizes="32x32" type="image/png" />
-    <link rel="apple-touch-icon" href="/icon-128.png?v=2" />
-    <link rel="stylesheet" href="/style.css" />
+    <link rel="icon" href="favicon.svg?v=2" type="image/svg+xml" />
+    <link rel="alternate icon" href="favicon-32.png?v=2" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="icon-128.png?v=2" />
+    <link rel="stylesheet" href="style.css" />
 
-    <meta property="og:title" content="Open Inspector" />
+    <link rel="canonical" href="https://patlf.github.io/open-inspector/" />
+
+    <!--
+      Absolute URLs, because link unfurlers (Product Hunt, Slack, X, Hacker
+      News readers) fetch these without a page to resolve them against.
+    -->
+    <meta property="og:site_name" content="Open Inspector" />
+    <meta property="og:title" content="Open Inspector — inspect any page, with no site access" />
     <meta
       property="og:description"
-      content="Inspect any page's layout, styles and design tokens. No site access requested."
+      content="Inspect any page's layout, styles and design tokens. No site access requested. Free, MIT, no account."
     />
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://patlf.github.io/open-inspector/" />
+    <meta property="og:image" content="https://patlf.github.io/open-inspector/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="Open Inspector: inspect any page. No site access requested."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
   </head>
 
   <body>
@@ -28,8 +44,8 @@
     -->
     <header class="topbar">
       <div class="wrap top">
-        <a class="brand" href="/">
-          <img src="/logo.svg" width="24" height="24" alt="" />
+        <a class="brand" href="./">
+          <img src="logo.svg" width="24" height="24" alt="" />
           Open Inspector
         </a>
         <nav>
@@ -39,6 +55,7 @@
           <a href="#keys">Shortcuts</a>
           <a href="#faq">FAQ</a>
           <a href="#install">Install</a>
+          <a href="https://github.com/patlf/open-inspector">GitHub</a>
         </nav>
       </div>
     </header>
@@ -70,8 +87,8 @@
         <figure class="hero-shot" aria-hidden="true">
           <!-- The panel has a dark theme; show the one the reader is actually in. -->
           <picture>
-            <source srcset="/shots/panel-styles-dark.png" media="(prefers-color-scheme: dark)" />
-            <img src="/shots/panel-styles.png" width="408" height="488" alt="" />
+            <source srcset="shots/panel-styles-dark.png" media="(prefers-color-scheme: dark)" />
+            <img src="shots/panel-styles.png" width="408" height="537" alt="" />
           </picture>
         </figure>
       </div>
@@ -145,8 +162,8 @@
       <section id="what">
         <div class="chapter"><span class="chapter-num">03</span><h2>What it shows you</h2></div>
         <p class="sub">
-          Seven panels, in the order the tabs run. The two in the middle are the ones nothing else
-          in this category offers.
+          Seven panels, in the order they sit on the panel's rail. The two in the middle are the
+          ones nothing else in this category offers.
         </p>
 
         <div class="walk">
@@ -176,8 +193,8 @@
             </div>
             <figure class="walk-visual">
               <picture>
-                <source srcset="/shots/panel-styles-dark.png" media="(prefers-color-scheme: dark)" />
-                <img src="/shots/panel-styles.png" width="408" height="488" loading="lazy"
+                <source srcset="shots/panel-styles-dark.png" media="(prefers-color-scheme: dark)" />
+                <img src="shots/panel-styles.png" width="408" height="537" loading="lazy"
                      alt="The Styles panel." />
               </picture>
             </figure>
@@ -194,8 +211,8 @@
             </div>
             <figure class="walk-visual">
               <picture>
-                <source srcset="/shots/panel-color-dark.png" media="(prefers-color-scheme: dark)" />
-                <img src="/shots/panel-color.png" width="408" height="488" loading="lazy"
+                <source srcset="shots/panel-color-dark.png" media="(prefers-color-scheme: dark)" />
+                <img src="shots/panel-color.png" width="408" height="537" loading="lazy"
                      alt="The Color panel." />
               </picture>
             </figure>
@@ -212,8 +229,8 @@
             </div>
             <figure class="walk-visual">
               <picture>
-                <source srcset="/shots/panel-type-dark.png" media="(prefers-color-scheme: dark)" />
-                <img src="/shots/panel-type.png" width="408" height="488" loading="lazy"
+                <source srcset="shots/panel-type-dark.png" media="(prefers-color-scheme: dark)" />
+                <img src="shots/panel-type.png" width="408" height="537" loading="lazy"
                      alt="The Type panel." />
               </picture>
             </figure>
@@ -230,8 +247,8 @@
             </div>
             <figure class="walk-visual">
               <picture>
-                <source srcset="/shots/panel-layout-dark.png" media="(prefers-color-scheme: dark)" />
-                <img src="/shots/panel-layout.png" width="408" height="488" loading="lazy"
+                <source srcset="shots/panel-layout-dark.png" media="(prefers-color-scheme: dark)" />
+                <img src="shots/panel-layout.png" width="408" height="537" loading="lazy"
                      alt="The Layout panel." />
               </picture>
             </figure>
@@ -248,8 +265,8 @@
             </div>
             <figure class="walk-visual">
               <picture>
-                <source srcset="/shots/panel-assets-dark.png" media="(prefers-color-scheme: dark)" />
-                <img src="/shots/panel-assets.png" width="408" height="488" loading="lazy"
+                <source srcset="shots/panel-assets-dark.png" media="(prefers-color-scheme: dark)" />
+                <img src="shots/panel-assets.png" width="408" height="537" loading="lazy"
                      alt="The Assets panel." />
               </picture>
             </figure>
@@ -266,8 +283,8 @@
             </div>
             <figure class="walk-visual">
               <picture>
-                <source srcset="/shots/panel-markup-dark.png" media="(prefers-color-scheme: dark)" />
-                <img src="/shots/panel-markup.png" width="408" height="488" loading="lazy"
+                <source srcset="shots/panel-markup-dark.png" media="(prefers-color-scheme: dark)" />
+                <img src="shots/panel-markup.png" width="408" height="537" loading="lazy"
                      alt="The Markup panel." />
               </picture>
             </figure>
@@ -284,8 +301,8 @@
             </div>
             <figure class="walk-visual">
               <picture>
-                <source srcset="/shots/panel-export-dark.png" media="(prefers-color-scheme: dark)" />
-                <img src="/shots/panel-export.png" width="408" height="488" loading="lazy"
+                <source srcset="shots/panel-export-dark.png" media="(prefers-color-scheme: dark)" />
+                <img src="shots/panel-export.png" width="408" height="537" loading="lazy"
                      alt="The Export panel." />
               </picture>
             </figure>
@@ -313,7 +330,7 @@
           </div>
           <div class="key-row">
             <span class="key-combo"><kbd>Esc</kbd></span>
-            <span class="key-what"><b>Stop picking</b>, so the page is clickable again. Press it again to close, which reverts every edit.</span>
+            <span class="key-what"><b>Stop picking</b>, so the page is clickable again. Press it again to close, which reverts every edit &mdash; with edits pending, it asks first.</span>
           </div>
           <div class="key-row">
             <span class="key-combo"><kbd>↑</kbd></span>
@@ -649,8 +666,8 @@
         <div class="section-head">
           <h2 class="plain">Install it</h2>
           <p class="sub">
-            Chrome Web Store review is in progress. Until it clears, building it yourself takes two
-            commands and gives you the same artifact.
+            One click from the Chrome Web Store, or two commands to build the same artifact
+            yourself from the source.
           </p>
         </div>
 
@@ -675,7 +692,7 @@
             <span class="install-state">Or</span>
             <h3>Build it yourself</h3>
             <p>
-              Once the repository is public: clone it, then load
+              Clone <a href="https://github.com/patlf/open-inspector">the repository</a>, then load
               <code>.output/chrome-mv3</code> as an unpacked extension.
             </p>
             <pre><code>pnpm install
@@ -700,13 +717,9 @@ pnpm build</code></pre>
 
       <footer>
         <span>MIT licensed · no telemetry · no account</span>
-        <!--
-          The repository link belongs here, and it is deliberately absent until
-          there is one to point at. A 404 behind the word "Source" on a site
-          whose entire argument is "you can check" would be worse than no link.
-        -->
         <nav>
-          <a href="/privacy">Privacy</a>
+          <a href="https://github.com/patlf/open-inspector">Source</a>
+          <a href="privacy/">Privacy</a>
         </nav>
       </footer>
     </div>

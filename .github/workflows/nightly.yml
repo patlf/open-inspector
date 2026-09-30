@@ -1,0 +1,73 @@
+name: Nightly
+
+# Checks that are too slow, or too dependent on the outside world, to gate a
+# pull request — but that should still fail loudly within a day.
+
+on:
+  schedule:
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sweep:
+    name: Reliability sweep (live sites)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      # Runs the engine against real production pages. Sites change without
+      # warning, so this reports rather than gates: the job fails only if no
+      # site could be probed at all, and the full report is kept either way.
+      - name: Sweep
+        run: pnpm sweep
+
+      - name: Upload sweep report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sweep-report
+          path: .output/sweep/
+          retention-days: 14
+
+  firefox:
+    name: Firefox build lints clean
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build (Firefox)
+        run: pnpm build:firefox
+
+      # CI builds Firefox on every push but nothing ever loaded it. Mozilla's
+      # own linter is what AMO review runs first: manifest keys Firefox
+      # rejects, APIs it does not have, and anything it considers unsafe.
+      - name: web-ext lint
+        run: npx --yes web-ext@8 lint --source-dir .output/firefox-mv3 --warnings-as-errors=false

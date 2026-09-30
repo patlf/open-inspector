@@ -13,8 +13,10 @@
   --sunk: #eaedef;
   --ink: #14181c;
   --ink-soft: #3d474e;
-  --ink-mute: #646d73;
-  --ink-mute-on-tint: #60696f;
+  /* 5:1 on --sunk, the darkest light surface. #646d73 was 4.4:1 in the
+     comparison table, which the extension's own audit flagged. */
+  --ink-mute: #5c656b;
+  --ink-mute-on-tint: #566066;
   --rule: #d5dbde;
   --rule-strong: #8b8f91;
   --accent: #b8451f;
@@ -278,10 +280,23 @@ code {
   border-bottom: 0;
 }
 
-/* Below this the panel would be a smudge above the copy that matters. */
+/*
+ * Below this the shot moves under the copy, cropped to its top.
+ *
+ * It used to be hidden outright, which left a phone visitor reading three
+ * paragraphs about a panel without ever seeing one — while still downloading
+ * the image. The top of the panel (selector, tabs, box model) is the part
+ * that says what the product is, so that is the part kept.
+ */
 @media (max-width: 940px) {
   .hero { grid-template-columns: 1fr; }
-  .hero-shot { display: none; }
+  .hero-shot {
+    max-height: 340px;
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent);
+    mask-image: linear-gradient(to bottom, #000 70%, transparent);
+  }
+  .hero-shot img { width: min(100%, 420px); margin: 0 auto; }
 }
 
 h2.plain { margin-bottom: var(--s2); }

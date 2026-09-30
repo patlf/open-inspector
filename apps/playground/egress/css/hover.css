@@ -1,0 +1,15 @@
+/*
+ * Served from a subdirectory on purpose. The url() below is relative to this
+ * file: it resolves to /egress/img/hover.svg. Resolved against the document
+ * instead (the bug a naive rule copy has), it becomes /img/hover.svg — a path
+ * the page never asks for.
+ *
+ * `u\72l(` is `url(` with one letter escaped. It is the same token to the
+ * browser, but Vite's dev server does not recognise it, and would otherwise
+ * rewrite the relative URL to an absolute one (or inline it as a data: URI)
+ * and quietly remove the very thing this fixture exists to test.
+ */
+.hover-target:hover {
+  background-image: u\72l(../img/hover.svg);
+  background-color: rgb(250, 240, 200);
+}

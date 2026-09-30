@@ -50,6 +50,11 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
 
+      # The collectors and the cascade checked against a real engine, which
+      # happy-dom cannot stand in for.
+      - name: Unit tests in a real browser
+        run: pnpm test:browser
+
       - name: End-to-end (real extension, real browser)
         run: pnpm e2e
 

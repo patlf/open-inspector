@@ -6,7 +6,7 @@ import type {
   RuleInfo,
   ScaleInfo,
 } from './view-model.js';
-import { Badge, CopyButton, Empty, Group, Meter, Rows, Swatch } from './primitives.jsx';
+import { Badge, CopyButton, Empty, Group, Meter, Rows, Swatch, copyText } from './primitives.jsx';
 import { ChangesSection, EditableRows, PseudoStates, useEditing } from './editing.jsx';
 import { BoxDiagram } from './box-diagram.jsx';
 import { assetUrlList, downloadAsset } from './download.js';
@@ -24,17 +24,7 @@ function ColorChip({ entry }: { entry: ColorEntry }) {
       type="button"
       class="chip"
       title={`${entry.hex} · ${entry.role}${entry.merged ? ` · ${entry.merged} similar merged` : ''}`}
-      onClick={() => {
-        const textarea = document.createElement('textarea');
-        textarea.value = entry.hex;
-        document.body.appendChild(textarea);
-        textarea.select();
-        try {
-          document.execCommand('copy');
-        } finally {
-          textarea.remove();
-        }
-      }}
+      onClick={(event) => void copyText(entry.hex, event.currentTarget)}
     >
       <Swatch color={entry.hex} />
       <span>{entry.hex}</span>
@@ -536,13 +526,9 @@ export function LayoutSection({ data }: SectionProps) {
   return (
     <>
       <Group title="This element lays out">
-        {layout.summary ? (
-          <div class="row">
-            <span class="row-label">summary</span>
-            <span class="row-value">{layout.summary}</span>
-            <CopyButton text={layout.summary} />
-          </div>
-        ) : null}
+        {/* A sentence, so it gets the full width and the interface face. In a
+            value column it wrapped to five lines of monospace. */}
+        {layout.summary ? <p class="summary">{layout.summary}</p> : null}
         <Rows fields={layout.fields} />
       </Group>
 
@@ -721,7 +707,8 @@ export function MarkupSection({ data }: SectionProps) {
         <div class="export-actions">
           <CopyButton text={text} label="copy" />
         </div>
-        <pre>{text}</pre>
+        {/* Focusable, so a keyboard user can scroll a long export. */}
+        <pre tabIndex={0}>{text}</pre>
         <Empty>
           Framework attributes, scripts and inline styles are stripped, and the subtree stops at six
           levels — this is markup to paste, not a recording of the live DOM.
@@ -763,7 +750,7 @@ export function ExportSection({ data }: SectionProps) {
         <div class="export-actions">
           <CopyButton text={current.text} label="copy all" />
         </div>
-        <pre>{current.text}</pre>
+        <pre tabIndex={0}>{current.text}</pre>
       </Group>
     </>
   );

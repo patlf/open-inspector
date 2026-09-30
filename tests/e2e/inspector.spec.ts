@@ -59,6 +59,22 @@ async function panelSelector(page: Page): Promise<string | undefined> {
   );
 }
 
+/**
+ * Let whatever the last input queued get painted.
+ *
+ * The session renders on the next animation frame after a pointer move, so
+ * two frames is enough for a change to show if one were coming. For proving
+ * something did *not* happen, where there is no state to wait for.
+ */
+async function nextFrames(page: Page): Promise<void> {
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
+}
+
 async function openInspector(page: Page, serviceWorker: Parameters<typeof activeTabId>[0]) {
   await page.goto(FIXTURE_URL, { waitUntil: 'domcontentloaded' });
   const tabId = await activeTabId(serviceWorker);
@@ -156,9 +172,9 @@ test.describe('inspecting a page', () => {
     await page.locator('#plain-button').click();
     await expect.poll(async () => panelSelector(page)).toBe('button#plain-button');
 
-    // Move the pointer right across the page; the selection must not follow.
-    await page.mouse.move(700, 700);
-    await page.waitForTimeout(300);
+    // Move the pointer onto a different element; the selection must not follow.
+    await page.locator('.card').first().hover();
+    await nextFrames(page);
 
     expect(await panelSelector(page)).toBe('button#plain-button');
     expect((await readOverlay(page)).present).toBe(true);
@@ -298,6 +314,11 @@ test.describe('forced pseudo-states', () => {
    * Hover styles are otherwise uninspectable — reaching the panel means
    * leaving the element, and the state goes with the pointer.
    */
+  /** The panel's `:hover` toggle. CSS locators pierce its open shadow root. */
+  function hoverToggle(page: Page) {
+    return page.locator('open-inspector-panel .state-toggle').filter({ hasText: /^:hover$/ });
+  }
+
   async function hoverBackground(page: Page): Promise<string> {
     return page.evaluate(
       () => getComputedStyle(document.querySelector('#plain-button')!).backgroundColor,
@@ -320,13 +341,7 @@ test.describe('forced pseudo-states', () => {
     await page.mouse.move(20, 700);
     await expect.poll(async () => hoverBackground(page)).not.toBe('rgb(0, 128, 0)');
 
-    await page.evaluate(() => {
-      const root = document.querySelector('open-inspector-panel')!.shadowRoot!;
-      const toggle = Array.from(root.querySelectorAll('button')).find(
-        (button) => button.textContent === ':hover',
-      );
-      (toggle as HTMLButtonElement | undefined)?.click();
-    });
+    await hoverToggle(page).click();
 
     await expect.poll(async () => hoverBackground(page)).toBe('rgb(0, 128, 0)');
   });
@@ -342,13 +357,7 @@ test.describe('forced pseudo-states', () => {
 
     await page.locator('#plain-button').click();
     await page.mouse.move(20, 700);
-    await page.evaluate(() => {
-      const root = document.querySelector('open-inspector-panel')!.shadowRoot!;
-      const toggle = Array.from(root.querySelectorAll('button')).find(
-        (button) => button.textContent === ':hover',
-      );
-      (toggle as HTMLButtonElement | undefined)?.click();
-    });
+    await hoverToggle(page).click();
     await expect.poll(async () => hoverBackground(page)).toBe('rgb(0, 128, 0)');
 
     // Escape unwinds selection, then picking, then closes.

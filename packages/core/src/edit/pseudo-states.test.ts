@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  absolutizeCssUrls,
   FORCE_ATTRIBUTE,
   FORCEABLE_STATES,
   createPseudoStateController,
@@ -57,6 +58,31 @@ describe('rewriteSelector', () => {
       (selector.match(/\.[\w-]+|\[[^\]]+\]|:(?!:)[\w-]+/g) ?? []).length;
 
     expect(classUnits(after)).toBe(classUnits(before));
+  });
+});
+
+describe('absolutizeCssUrls', () => {
+  const base = 'https://example.com/css/site.css';
+
+  it('resolves relative URLs against the source sheet, not the document', () => {
+    expect(absolutizeCssUrls('background-image: url("../img/arrow.svg");', base)).toBe(
+      'background-image: url("https://example.com/img/arrow.svg");',
+    );
+  });
+
+  it('handles unquoted and single-quoted forms', () => {
+    expect(absolutizeCssUrls("background: url(a.png), url('b.png');", base)).toBe(
+      'background: url("https://example.com/css/a.png"), url("https://example.com/css/b.png");',
+    );
+  });
+
+  it('leaves fragments, data: and blob: URLs alone', () => {
+    const css = 'filter: url(#glow); background: url("data:image/png;base64,AAAA"), url(blob:x);';
+    expect(absolutizeCssUrls(css, base)).toBe(css);
+  });
+
+  it('is a no-op with no base', () => {
+    expect(absolutizeCssUrls('background: url(a.png);', null)).toBe('background: url(a.png);');
   });
 });
 

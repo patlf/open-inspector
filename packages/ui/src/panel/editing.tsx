@@ -142,6 +142,7 @@ function ColorWell({
       type="color"
       class="color-well"
       value={hex}
+      aria-label="Pick a colour"
       title={`Pick a colour${alpha < 1 ? ` — the current ${Math.round(alpha * 100)}% opacity is kept` : ''}`}
       onInput={(event) => {
         const picked = (event.target as HTMLInputElement).value;
@@ -291,7 +292,7 @@ export function EditableRow({ field }: { field: Field }) {
             value={field.swatch}
             onPick={(next) => {
               editing.onBeginEdit();
-              editing.apply(property, next);
+              editing.apply(field.swatchProperty ?? property, next);
             }}
           />
         ) : null}

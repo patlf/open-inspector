@@ -1,0 +1,8 @@
+/*
+ * Linked from hostile.html as http://cross.localhost:5178/hostile/cross.css while the
+ * page itself is on http://localhost:5178 — a different origin, requested
+ * without `crossorigin`, so its rules are opaque to every script on the page,
+ * extensions included. The panel has to say so rather than report "no rules".
+ */
+.title { text-decoration: underline; }
+.hover-me:hover { outline: 2px solid rgb(0, 128, 0); }

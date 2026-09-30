@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Open Inspector egress fixture</title>
+
+    <!--
+      Referenced, never loaded. Each of these is listed as an asset, and none
+      is fetched by the page, so a thumbnail of any of them would be the
+      extension's own request. The paths do not exist; a request for one shows
+      up as a 404 in the recorder, which is exactly as loud as it should be.
+    -->
+    <meta property="og:image" content="/egress/img/unloaded-og.png" />
+    <link rel="apple-touch-icon" href="/egress/img/unloaded-touch-icon.png" />
+    <!-- A preload whose media never matches is never fetched. -->
+    <link rel="preload" as="image" href="/egress/img/unloaded-preload.png" media="(max-width: 1px)" />
+    <!--
+      Prefetches. Chrome does fetch these, at low priority, so they appear in
+      Resource Timing — but a prefetch lands in the HTTP cache, not the
+      document's memory cache, and one that 404s is not cached at all. A
+      thumbnail of either is a fresh request. See the fixme in zero-egress.spec.ts.
+    -->
+    <link rel="prefetch" as="image" href="/egress/img/prefetch-404.png" />
+    <link rel="prefetch" as="image" href="/egress/img/prefetched.svg" />
+
+    <!-- The :hover rule lives here, with a url() relative to this file. -->
+    <link rel="stylesheet" href="/egress/css/hover.css" />
+
+    <style>
+      body { margin: 0; font: 15px/1.5 system-ui, sans-serif; color: #14181c; background: #f4f5f6; }
+      main { max-width: 40rem; margin: 0 auto; padding: 2rem 1.5rem; display: grid; gap: 1.25rem; }
+      .card { background: #fff; border: 1px solid #dbe0e3; border-radius: 4px; padding: 1rem; }
+      .hover-target { padding: 1rem 1.25rem; border: 1px dashed #97671b; background-repeat: no-repeat; background-position: right 8px center; }
+      .never-shown { display: none; background-image: url(/egress/img/unloaded-hidden-bg.png); }
+      .faint { color: #b0b0b0; }
+    </style>
+  </head>
+
+  <body>
+    <main>
+      <h1>Egress fixture</h1>
+      <p class="card">Nothing on this page should be fetched twice, and nothing it did not fetch should be fetched at all.</p>
+
+      <!-- Loaded by the page, so its thumbnail is a cache hit. -->
+      <img id="loaded" src="/egress/img/loaded.svg" width="48" height="48" alt="Loaded image" />
+
+      <!--
+        The correctly resolved target of the hover rule, loaded up front so a
+        forced :hover that resolves it correctly is served from memory. Only a
+        wrongly resolved path would then reach the network.
+      -->
+      <img src="/egress/img/hover.svg" width="16" height="16" alt="" />
+
+      <div class="hover-target card" id="hover-target">Force :hover on me</div>
+      <div class="never-shown">Hidden, and so is its background.</div>
+      <p class="faint card">Deliberately low-contrast text for the audit.</p>
+    </main>
+  </body>
+</html>

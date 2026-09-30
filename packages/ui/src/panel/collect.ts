@@ -318,11 +318,34 @@ function readSpacing(style: CSSStyleDeclaration): Field[] {
   ]);
 }
 
+/**
+ * Colour rows show their colour, the same way the Color tab does.
+ *
+ * A value like `2px solid rgb(219, 224, 227)` is readable but not scannable;
+ * the chip is what makes a wrong grey jump out.
+ */
+function withSwatch(row: Field | null, color: string, swatchProperty?: string): Field | null {
+  if (!row || !color) return row;
+  row.swatch = color;
+  if (swatchProperty) row.swatchProperty = swatchProperty;
+  return row;
+}
+
 function readAppearance(style: CSSStyleDeclaration): Field[] {
+  // A border with no width or no style draws nothing, so it gets no chip.
+  const borderDrawn = style.borderTopStyle !== 'none' && parseFloat(style.borderTopWidth) > 0;
+
   return compact([
-    field('background', style.backgroundColor, undefined, 'background-color'),
+    withSwatch(
+      field('background', style.backgroundColor, undefined, 'background-color'),
+      style.backgroundColor,
+    ),
     field('background image', style.backgroundImage, undefined, 'background-image'),
-    field('border', style.border, undefined, 'border'),
+    withSwatch(
+      field('border', style.border, undefined, 'border'),
+      borderDrawn ? style.borderTopColor : '',
+      'border-color',
+    ),
     field('radius', style.borderRadius, undefined, 'border-radius'),
     field('box shadow', style.boxShadow, undefined, 'box-shadow'),
     field('opacity', style.opacity === '1' ? null : style.opacity, undefined, 'opacity'),

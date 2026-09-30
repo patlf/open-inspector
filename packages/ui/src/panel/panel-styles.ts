@@ -48,22 +48,37 @@ export const PANEL_STYLES = `
     --accent-wash: rgba(228, 116, 63, 0.14);
     --good: #6aab84;
     --warn: #c79b4a;
-    --risk: #d9705f;
+    /* Lifted from #d9705f so a risk pill on its own wash clears AA. */
+    --risk: #e07a69;
     --mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
     --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    /*
+     * The box model's DevTools colours, per theme.
+     *
+     * They used to be the same pale fills in both themes, which kept the
+     * diagram legible but made it the brightest thing on a dark panel by far.
+     * Dark gets the same hues sunk to the panel's depth, with light ink; every
+     * number clears 4.5:1 on its own fill in both themes.
+     */
+    --bd-margin: #4a3627;
+    --bd-border: #4a4327;
+    --bd-padding: #2e4331;
+    --bd-content: #294453;
+    --bd-ink: #e6eaec;
+    --bd-zero: #b3bcc2;
 
     position: fixed;
     top: 12px;
     right: 12px;
     bottom: 12px;
+    /* Overridden inline once the inner edge has been dragged. */
     width: 348px;
     max-width: calc(100vw - 24px);
     display: flex;
-    flex-direction: column;
     background: var(--bg);
     color: var(--ink);
     border: 1px solid var(--rule);
-    border-radius: 6px;
+    border-radius: 10px;
     box-shadow: 0 16px 48px -12px rgba(0, 0, 0, 0.65), 0 2px 8px rgba(0, 0, 0, 0.4);
     font-family: var(--sans);
     font-size: 12px;
@@ -79,9 +94,11 @@ export const PANEL_STYLES = `
       --bg-sunk: #eaedef;
       --ink: #14181c;
       --ink-soft: #3d474e;
-      --ink-mute: #646d73;
+      /* Tuned against --bg-sunk, the darkest light surface: 5.06:1 there. */
+      --ink-mute: #5c656b;
       --rule: #d5dbde;
-      --rule-strong: #8b8f91;
+      /* 3.5:1 on sunk, clearing the 3:1 that WCAG 1.4.11 asks of a boundary. */
+      --rule-strong: #787d80;
       /*
        * White reads on the light accent (5.37:1) but only 3.06:1 on the dark
        * one, which is why the most prominent control in the panel — the
@@ -91,14 +108,29 @@ export const PANEL_STYLES = `
       --on-accent: #ffffff;
       --accent: #b8451f;
       --accent-wash: rgba(184, 69, 31, 0.10);
-      --good: #3f7d58;
-      --warn: #97671b;
+      /* Both clear 4.5:1 on sunk, where the copied state and notes sit. */
+      --good: #376f4e;
+      --warn: #86591a;
       --risk: #a8352b;
+      --bd-margin: #fbe3cc;
+      --bd-border: #fcf1c6;
+      --bd-padding: #dbebd4;
+      --bd-content: #cfe1ec;
+      --bd-ink: #14181c;
+      --bd-zero: #50555b;
       box-shadow: 0 16px 48px -18px rgba(20, 24, 28, 0.4), 0 1px 3px rgba(20, 24, 28, 0.16);
     }
   }
 
   .panel[data-side='left'] { right: auto; left: 12px; }
+
+  /* Everything but the rail: header, the tab's content, the footer. */
+  .main {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
 
   /* ---------- collapsed ---------- */
 
@@ -115,15 +147,21 @@ export const PANEL_STYLES = `
     width: 24px;
     padding: 26px 0;
     writing-mode: vertical-rl;
-    letter-spacing: 0.14em;
-    font-size: 9px;
-    text-transform: uppercase;
-    border: 1px solid #2b343a;
+    /*
+     * In the accent, because it is the only trace of the inspector left on
+     * screen. A grey tab at the edge of a busy page read as part of the page,
+     * and collapsing looked like closing.
+     */
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid #e4743f;
     border-right: 0;
-    border-radius: 5px 0 0 5px;
-    background: #14181c;
-    color: #b3bcc2;
-    font: 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    border-radius: 6px 0 0 6px;
+    background: #e4743f;
+    color: #14181c;
+    font: 600 11px/1 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    letter-spacing: 0.02em;
     cursor: pointer;
     pointer-events: auto;
     box-shadow: -4px 0 16px -6px rgba(0, 0, 0, 0.6);
@@ -131,20 +169,19 @@ export const PANEL_STYLES = `
   .panel-tab[data-side='left'] {
     right: auto;
     left: 0;
-    border: 1px solid #2b343a;
+    border: 1px solid #e4743f;
     border-left: 0;
-    border-radius: 0 5px 5px 0;
+    border-radius: 0 6px 6px 0;
     box-shadow: 4px 0 16px -6px rgba(0, 0, 0, 0.6);
   }
-  .panel-tab:hover { color: #e4743f; }
+  .panel-tab:hover { filter: brightness(1.08); }
 
   @media (prefers-color-scheme: light) {
     .panel-tab {
-      background: #ffffff;
-      color: #3d474e;
-      border-color: #d5dbde;
+      background: #b8451f;
+      border-color: #b8451f;
+      color: #ffffff;
     }
-    .panel-tab:hover { color: #b8451f; }
   }
 
   /* ---------- toolbar ---------- */
@@ -153,53 +190,59 @@ export const PANEL_STYLES = `
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 10px 0;
+  }
+
+  /* Also an .icon-btn, for its colours; this undoes that class's square box. */
+  .icon-btn.hide-btn {
+    width: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    flex: none;
+    height: 24px;
+    padding: 0 8px;
+    border-radius: 6px;
+    color: var(--ink-soft);
+  }
+  .btn-label {
+    font-family: var(--sans);
+    font-size: 11px;
   }
 
   /*
-   * Two rows, because they are not the same kind of control.
+   * A filled field, not an outlined one.
    *
-   * The filter acts on the panel, hide acts on the selected element, and the
-   * presets act on the browser window. Three scopes crowded into one strip
-   * read as a row of unrelated buttons — and left no room to label the one
-   * that was only an icon.
+   * The icon and the placeholder say what it is; the outline only added one
+   * more line to a header that was all lines. Focus still draws the full ring.
    */
-  .toolbar-page { padding: 4px 10px 8px; }
-
-  .toolbar-label {
-    font-family: var(--mono);
-    font-size: 9px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--ink-mute);
-    flex: none;
-  }
-
-  .hide-btn {
-    display: inline-flex;
+  .search-box {
+    flex: 1;
+    min-width: 0;
+    display: flex;
     align-items: center;
-    gap: 4px;
-    flex: none;
+    gap: 6px;
+    height: 24px;
+    padding: 0 8px;
+    border-radius: 6px;
+    background: var(--bg-sunk);
+    color: var(--ink-mute);
+    cursor: text;
   }
-  .btn-label {
-    font-family: var(--mono);
-    font-size: 9.5px;
-  }
+  .search-box:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
 
   .search {
     flex: 1;
     min-width: 0;
-    height: 22px;
-    padding: 0 7px;
-    border: 1px solid var(--rule-strong);
-    border-radius: 4px;
-    background: var(--bg-sunk);
+    height: 100%;
+    padding: 0;
+    border: 0;
+    outline: none;
+    background: transparent;
     color: var(--ink);
     font-family: var(--sans);
-    font-size: 11px;
+    font-size: 11.5px;
   }
   .search::placeholder { color: var(--ink-mute); }
-  .search:focus { outline: none; border-color: var(--accent); }
   .search::-webkit-search-cancel-button { filter: grayscale(1) opacity(0.6); }
 
   /*
@@ -208,31 +251,29 @@ export const PANEL_STYLES = `
    */
   .viewport {
     display: inline-flex;
-    border: 1px solid var(--rule-strong);
-    border-radius: 4px;
-    overflow: hidden;
+    /* Sized to its buttons, not stretched across the Layout group. */
+    align-self: flex-start;
+    gap: 2px;
+    padding: 2px;
+    border-radius: 7px;
     background: var(--bg-sunk);
   }
   .viewport-btn {
-    padding: 0 5px;
+    padding: 0 8px;
     height: 20px;
     border: 0;
-    border-right: 1px solid var(--rule);
+    border-radius: 5px;
     background: transparent;
     color: var(--ink-soft);
     font-family: var(--mono);
-    font-size: 9.5px;
+    font-size: 10px;
     line-height: 20px;
     cursor: pointer;
   }
-  .viewport-btn:last-child { border-right: 0; }
-  .viewport-btn:hover { color: var(--ink); }
+  .viewport-btn:hover { color: var(--ink); background: transparent; }
   /*
-   * Filled when active, matching the force-state chips.
-   *
-   * The accent-on-wash treatment it had measured 3.99:1, and it also read as
-   * merely tinted next to a chip that fills solid — two controls with the same
-   * on/off meaning should not signal it two different ways.
+   * Filled with the accent when a width is forced, because accent means "you
+   * have changed something" — the window really has moved.
    */
   .viewport-btn[aria-pressed='true'] { background: var(--accent); color: var(--on-accent); }
 
@@ -244,8 +285,9 @@ export const PANEL_STYLES = `
    * was happening, which is exactly backwards.
    */
   .viewport-btn[data-resting='true'][aria-pressed='true'] {
-    background: var(--bg-raised);
+    background: var(--bg);
     color: var(--ink);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
   }
 
   /*
@@ -285,7 +327,6 @@ export const PANEL_STYLES = `
     font-size: 9.5px;
     line-height: 20px;
     color: var(--warn);
-    border-left: 1px solid var(--rule);
   }
 
   /*
@@ -317,55 +358,158 @@ export const PANEL_STYLES = `
     display: none;
   }
 
+  /*
+   * Nor are the diagram and the state chips kept: neither has a row the
+   * filter can match, so they survived every query and pushed the rows that
+   * did match off the first screen.
+   */
+  .body[data-searching='true'] .group:has(> .boxdiagram),
+  .body[data-searching='true'] .group:has(> .states) {
+    display: none;
+  }
+
   /* ---------- header ---------- */
 
   .head {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding: 10px 12px;
-    background: var(--bg-raised);
+    gap: 7px;
+    padding: 9px 8px 9px 12px;
     border-bottom: 1px solid var(--rule);
     flex: none;
   }
 
-  .head-top { display: flex; align-items: center; gap: 8px; }
+  .head-top { display: flex; align-items: center; gap: 8px; min-height: 26px; }
 
+  /*
+   * Ink, not accent. Accent marks what you have changed or switched on; the
+   * element's name is neither, and painting it orange made it compete with
+   * the edits it was meant to be read alongside.
+   */
   .selector {
     font-family: var(--mono);
     font-size: 12px;
-    color: var(--accent);
+    font-weight: 600;
+    color: var(--ink);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    flex: 1 1 auto;
+    flex: 0 1 auto;
     min-width: 0;
   }
 
   /*
-   * Pushed right, on the row that describes the element.
-   *
-   * It used to sit in the title row between the selector and the buttons,
-   * where it and an 88px button squeezed the selector — the single most
-   * important label in the panel — down to about ten characters.
+   * Directly after the selector, and never cut. A clipped size reads as a
+   * different number ("256 × 20" of "256 × 202.45"); the selector truncates
+   * with an ellipsis instead, and carries its full text as a title.
    */
   .dims {
-    margin-left: auto;
     font-family: var(--mono);
     font-size: 10px;
     color: var(--ink-mute);
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
     flex: none;
   }
 
-  .head-actions { display: flex; gap: 4px; flex: none; }
+  .head-actions { display: flex; gap: 2px; flex: none; margin-left: auto; }
+
+  /*
+   * The page is modified: say so from every tab.
+   *
+   * Accent, because accent means "changed" — this is the one piece of chrome
+   * that earns it. On the tab rather than in the header, where it squeezed
+   * the selector, the single most important label in the panel.
+   */
+  .tab-count {
+    position: absolute;
+    top: -2px;
+    right: -3px;
+    min-width: 14px;
+    padding: 0 3px;
+    border-radius: 7px;
+    background: var(--accent);
+    color: var(--on-accent);
+    font-size: 9.5px;
+    font-weight: 600;
+    line-height: 14px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    box-shadow: 0 0 0 2px var(--bg-raised);
+  }
+
+  /* The close button, when pressing it would revert something. */
+  .icon-btn[data-pending='true'] { color: var(--accent); }
+
+  .confirm-close {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    background: var(--bg);
+    font-size: 11px;
+    line-height: 1.45;
+  }
+  .confirm-close p { margin: 0; color: var(--ink-soft); }
+  .confirm-close b { color: var(--ink); font-weight: 600; }
+  .confirm-actions { display: flex; gap: 6px; }
+  .confirm-actions button {
+    font-size: 11px;
+    border-color: var(--rule-strong);
+    border-radius: 5px;
+  }
+  .confirm-actions .confirm-yes {
+    background: var(--accent);
+    color: var(--on-accent);
+    border-color: var(--accent);
+  }
+  .confirm-actions .confirm-yes:hover { filter: brightness(1.08); background: var(--accent); }
+
+  /*
+   * The inner edge of the panel, as a drag handle.
+   *
+   * Invisible until it is wanted: a hairline of accent on hover or focus is
+   * enough to say "this edge moves" without a grip icon on every screen.
+   */
+  .resize-handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 6px;
+    /* Above the rail, which sits on the same edge when the panel is docked right. */
+    z-index: 3;
+    cursor: ew-resize;
+    touch-action: none;
+  }
+  .panel[data-side='left'] .resize-handle { left: auto; right: 0; }
+  .resize-handle::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 2px;
+    background: transparent;
+    transition: background 120ms ease-out;
+  }
+  .panel[data-side='left'] .resize-handle::after { left: auto; right: 0; }
+  .resize-handle:hover::after,
+  .resize-handle:focus-visible::after,
+  .resize-handle[data-dragging='true']::after { background: var(--accent); }
+  .resize-handle:focus-visible { outline: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .resize-handle::after { transition: none; }
+  }
 
   button {
     font: inherit;
     color: inherit;
     background: transparent;
     border: 1px solid transparent;
-    border-radius: 3px;
+    border-radius: 5px;
     cursor: pointer;
     padding: 3px 6px;
   }
@@ -373,29 +517,38 @@ export const PANEL_STYLES = `
   button:hover { background: var(--bg-sunk); }
   button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
+  .icon {
+    display: block;
+    flex: none;
+  }
+
   .icon-btn {
-    font-family: var(--mono);
-    font-size: 11px;
+    display: inline-grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
     color: var(--ink-mute);
     line-height: 1;
   }
-  .icon-btn[aria-pressed='true'] { color: var(--accent); border-color: var(--rule); }
+  .icon-btn:hover { color: var(--ink); }
+  .icon-btn[aria-pressed='true'] { color: var(--accent); background: var(--accent-wash); }
 
   /*
-   * Always filled, always the most prominent thing in the header. The state
-   * is carried by the trailing word and a dot, not by making the button
-   * disappear into the chrome when it is off — a control nobody can find is
-   * worse than one that is always slightly loud.
+   * Labelled and filled while nothing is selected, where it is the only thing
+   * to do. The state is carried by the trailing word, not by making the button
+   * disappear into the chrome when it is off.
    */
   .primary-btn {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    font-family: var(--mono);
-    font-size: 10.5px;
-    letter-spacing: 0.04em;
-    padding: 4px 8px;
-    border-radius: 3px;
+    gap: 6px;
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 4px 9px 4px 7px;
+    border-radius: 6px;
     white-space: nowrap;
     background: var(--accent);
     border: 1px solid var(--accent);
@@ -405,13 +558,13 @@ export const PANEL_STYLES = `
   .primary-btn:hover { filter: brightness(1.08); background: var(--accent); }
 
   .primary-btn .state {
-    font-size: 9px;
-    letter-spacing: 0.08em;
+    font-size: 9.5px;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    padding-left: 5px;
-    border-left: 1px solid currentColor;
-    /* Separated by a rule, not by being faded — fading it cost 1.5:1. */
-    opacity: 0.75;
+    padding-left: 6px;
+    /* Separated by a rule, not by being faded — fading it cost 1.5:1. The
+       separator may fade; the label may not. */
+    border-left: 1px solid color-mix(in srgb, currentColor 40%, transparent);
   }
 
   /* Held: the picker is paused, so drop to an outline. */
@@ -421,9 +574,28 @@ export const PANEL_STYLES = `
   }
   .primary-btn[aria-pressed='false']:hover { background: var(--accent-wash); }
   .primary-btn[aria-pressed='false'] .state { border-left-color: var(--accent); }
-  /* The separator may fade; the label may not. */
-  .primary-btn .state { opacity: 1; }
-  .primary-btn .state { border-left-color: color-mix(in srgb, currentColor 40%, transparent); }
+
+  /*
+   * Once an element is held: the same button as an icon. Filled while picking,
+   * because the page cannot be clicked then and that must be obvious; outlined
+   * in the accent while paused, so it still reads as the thing to press next
+   * rather than as one more grey icon in a row of them.
+   */
+  .primary-btn[data-compact='true'] {
+    /* .primary-btn comes later than .icon-btn and is inline-flex, which left
+       the icon hugging the left edge of its square. */
+    justify-content: center;
+    gap: 0;
+    padding: 0;
+    font-weight: 400;
+  }
+  .primary-btn[data-compact='true'][aria-pressed='false'] {
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    background: transparent;
+  }
+  .primary-btn[data-compact='true'][aria-pressed='false']:hover { background: var(--accent-wash); }
+  .primary-btn[data-compact='true'][aria-pressed='true']:hover { color: var(--on-accent); }
 
   /* ---------- editing ---------- */
 
@@ -491,12 +663,13 @@ export const PANEL_STYLES = `
   .state-toggle {
     font-family: var(--mono);
     font-size: 10px;
-    color: var(--ink-mute);
-    border-color: var(--rule);
+    color: var(--ink-soft);
+    background: var(--bg-sunk);
     padding: 3px 7px;
   }
+  .state-toggle:hover { color: var(--ink); }
   .state-toggle[aria-pressed='true'] {
-    color: var(--bg);
+    color: var(--on-accent);
     background: var(--accent);
     border-color: var(--accent);
   }
@@ -537,7 +710,7 @@ export const PANEL_STYLES = `
     padding: 4px;
     border-radius: 3px;
   }
-  .asset:hover { background: var(--bg-raised); }
+  .asset:hover { background: var(--bg-sunk); }
 
   /*
    * A checkerboard behind every thumbnail.
@@ -552,8 +725,7 @@ export const PANEL_STYLES = `
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid var(--rule);
-    border-radius: 3px;
+    border-radius: 5px;
     overflow: hidden;
     background-color: #8b8b8b;
     background-image:
@@ -577,7 +749,7 @@ export const PANEL_STYLES = `
 
   .asset-thumb-note {
     font-family: var(--mono);
-    font-size: 8px;
+    font-size: 9.5px;
     line-height: 1.2;
     text-align: center;
     color: var(--ink-mute);
@@ -598,20 +770,23 @@ export const PANEL_STYLES = `
 
   .asset-meta {
     font-family: var(--mono);
-    font-size: 9.5px;
+    font-size: 10px;
     color: var(--ink-mute);
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .asset-actions { display: flex; gap: 2px; }
   .asset .copy { opacity: 0; }
-  .asset:hover .copy, .asset .copy:focus-visible { opacity: 1; }
+  .asset:hover .copy, .asset:focus-within .copy { opacity: 1; }
 
   /* ---------- changes list ---------- */
 
   .change-block {
-    border: 1px solid var(--rule);
-    border-radius: 4px;
+    border-radius: 6px;
+    background: var(--bg-raised);
     overflow: hidden;
   }
 
@@ -620,8 +795,7 @@ export const PANEL_STYLES = `
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    padding: 4px 8px;
-    background: var(--bg-raised);
+    padding: 5px 8px;
     font-family: var(--mono);
     font-size: 10.5px;
   }
@@ -703,6 +877,20 @@ export const PANEL_STYLES = `
     color: var(--ink-mute);
   }
 
+  .onboard-note {
+    margin: 4px 0 0;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--ink-mute);
+  }
+
+  /* The shortcut sheet, when opened from the header's "?" button. */
+  .head .onboard-keys {
+    padding: 8px;
+    border-radius: 6px;
+    background: var(--bg-raised);
+  }
+
   .onboard-keys b {
     font-family: var(--mono);
     font-weight: 500;
@@ -715,41 +903,47 @@ export const PANEL_STYLES = `
   }
 
   .boundary-note {
-    font-family: var(--mono);
-    font-size: 10px;
+    margin: 0;
+    font-size: 11px;
+    line-height: 1.45;
     color: var(--warn);
-    letter-spacing: 0.03em;
   }
 
   /* ---------- breadcrumb ---------- */
 
-  .crumbs { display: flex; flex-direction: column; gap: 4px; }
+  .crumbs { display: flex; align-items: center; gap: 6px; min-width: 0; }
 
   /*
-   * Scrolls sideways rather than wrapping.
+   * Scrolls sideways rather than wrapping, and is kept scrolled to its end.
    *
-   * A deep DOM produces a long path; wrapping it would push the tabs down the
-   * panel every time the selection moved, which makes the whole header jump
-   * around as you navigate.
+   * A deep DOM produces a long path; wrapping it would push everything below
+   * down the panel every time the selection moved.
    */
   .crumb-trail {
+    flex: 1 1 auto;
+    min-width: 0;
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: 1px;
     overflow-x: auto;
     scrollbar-width: none;
-    padding-bottom: 1px;
   }
   .crumb-trail::-webkit-scrollbar { display: none; }
+  /* Only when the start of the path is actually scrolled out of view. */
+  .crumb-trail[data-clipped='true'] {
+    mask-image: linear-gradient(to right, transparent, #000 16px);
+  }
 
-  .crumb-item { display: inline-flex; align-items: center; gap: 2px; flex: none; }
+  .crumb-item { display: inline-flex; align-items: center; gap: 1px; flex: none; }
   .crumb-sep { color: var(--ink-mute); font-size: 10px; }
 
   .crumb {
     font-family: var(--mono);
-    font-size: 10px;
+    font-size: 10.5px;
     color: var(--ink-mute);
-    padding: 1px 4px;
+    padding: 1px 3px;
+    border: 0;
+    border-radius: 4px;
     white-space: nowrap;
     max-width: 140px;
     overflow: hidden;
@@ -757,70 +951,116 @@ export const PANEL_STYLES = `
   }
   .crumb:hover { color: var(--ink); background: var(--bg-sunk); }
   .crumb[aria-current='true'] {
-    color: var(--accent);
+    color: var(--ink);
+    font-weight: 500;
     cursor: default;
     background: transparent;
   }
 
-  .crumb-steps { display: flex; align-items: center; gap: 2px; }
+  .crumb-steps { display: flex; align-items: center; flex: none; margin-left: -4px; }
 
   .step {
-    font-family: var(--mono);
-    font-size: 11px;
-    line-height: 1;
+    display: inline-grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: 5px;
     color: var(--ink-soft);
-    border-color: var(--rule);
-    padding: 2px 6px;
   }
   /*
-   * Same reasoning as the state toggles. "No previous sibling" is information;
-   * at 0.35 opacity the arrow measured 1.5:1 and simply looked broken.
+   * Receded, not faded. "No previous sibling" is information, so the arrow
+   * stays at a colour that clears 3:1 as an icon; at 0.35 opacity it measured
+   * 1.5:1 and simply looked broken.
    */
-  .step:disabled { color: var(--ink-mute); border-style: dashed; cursor: not-allowed; }
+  .step:disabled { color: var(--rule-strong); cursor: not-allowed; }
   .step:disabled:hover { background: transparent; }
 
   .crumb-count {
+    flex: none;
     font-family: var(--mono);
-    font-size: 9.5px;
+    font-size: 10px;
     color: var(--ink-mute);
-    margin-left: 4px;
     font-variant-numeric: tabular-nums;
   }
 
-  /* ---------- tabs ---------- */
+  /* ---------- rail ---------- */
 
-  .tabs {
-    display: flex;
-    gap: 0;
-    padding: 0 6px;
-    background: var(--bg-raised);
-    border-bottom: 1px solid var(--rule);
+  /*
+   * Always on the outer edge of the panel, whichever side it is docked to,
+   * so the sections sit where the eye expects a tool palette.
+   */
+  .rail {
+    position: relative;
+    z-index: 2;
     flex: none;
-    overflow-x: auto;
-    scrollbar-width: none;
-    /*
-     * Seven tabs do not fit in 348px, so the strip scrolls. A tab sheared off
-     * mid-word at the edge reads as a rendering bug; the mask fades the last
-     * few pixels instead, which reads as "there is more this way".
-     */
-    mask-image: linear-gradient(to right, #000 calc(100% - 18px), transparent);
+    width: 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 0;
+    background: var(--bg-raised);
+    border-right: 1px solid var(--rule);
   }
-  .tabs::-webkit-scrollbar { display: none; }
+
+  .tabs { display: flex; flex-direction: column; gap: 3px; }
 
   .tab {
-    font-family: var(--mono);
-    font-size: 10.5px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--ink-mute);
-    padding: 7px 8px;
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
     border: 0;
-    border-bottom: 2px solid transparent;
-    border-radius: 0;
-    white-space: nowrap;
+    border-radius: 7px;
+    color: var(--ink-mute);
   }
-  .tab:hover { background: transparent; color: var(--ink-soft); }
-  .tab[aria-selected='true'] { color: var(--ink); border-bottom-color: var(--accent); }
+  .tab:hover { color: var(--ink); background: var(--bg-sunk); }
+  .tab[aria-selected='true'] {
+    color: var(--accent);
+    background: var(--bg);
+    box-shadow: 0 0 0 1px var(--rule), 0 1px 2px rgba(0, 0, 0, 0.12);
+  }
+
+  /*
+   * The tab's name, as a label that shows on hover and on keyboard focus.
+   *
+   * Real text in the button rather than a title attribute: a title takes a
+   * second to appear and never appears for keyboard users at all.
+   */
+  .tab-label {
+    position: absolute;
+    left: calc(100% + 8px);
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 3px 7px;
+    border-radius: 5px;
+    background: var(--ink);
+    color: var(--bg);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.3;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 100ms ease-out;
+  }
+  .tab:hover .tab-label,
+  .tab:focus-visible .tab-label { opacity: 1; transition-delay: 150ms; }
+  @media (prefers-reduced-motion: reduce) {
+    .tab-label { transition: none; }
+  }
+
+  .rail-foot {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+  .rail-foot .icon-btn { width: 30px; height: 30px; border-radius: 7px; }
 
   /* ---------- body ---------- */
 
@@ -828,10 +1068,10 @@ export const PANEL_STYLES = `
     flex: 1 1 auto;
     overflow-y: auto;
     overscroll-behavior: contain;
-    padding: 10px 12px 16px;
+    padding: 12px 10px 16px 12px;
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 12px;
   }
 
   .body::-webkit-scrollbar { width: 10px; }
@@ -841,37 +1081,80 @@ export const PANEL_STYLES = `
     border: 3px solid var(--bg);
   }
 
-  .group { display: flex; flex-direction: column; gap: 5px; }
+  .group { display: flex; flex-direction: column; gap: 4px; }
 
-  .group-title {
-    font-family: var(--mono);
-    font-size: 9.5px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--ink-mute);
-    display: flex;
-    align-items: center;
-    gap: 6px;
+  /* A hairline between groups does the separating the heading rules used to. */
+  .body > .group + .group {
+    border-top: 1px solid var(--rule);
+    padding-top: 12px;
   }
-  .group-title::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: var(--rule);
+
+  /* Sentence case, the interface face, no rule: a label, not a banner. */
+  .group-title {
+    margin: 0 0 2px;
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ink-mute);
+  }
+
+  .summary {
+    margin: 0 0 4px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--ink);
   }
 
   /* ---------- rows ---------- */
 
+  /*
+   * A label and a value in a filled field, the way design tools lay out an
+   * inspector. The field says "this is the value, and it is yours to change"
+   * without a border on every line.
+   */
   .row {
+    position: relative;
     display: grid;
-    grid-template-columns: 74px minmax(0, 1fr) auto;
-    align-items: baseline;
-    gap: 4px 8px;
-    padding: 2px 4px;
-    border-radius: 3px;
+    grid-template-columns: 76px minmax(0, 1fr);
+    align-items: center;
+    gap: 6px;
     cursor: default;
   }
-  .row:hover { background: var(--bg-raised); }
+
+  /*
+   * Inside the field's right end rather than in a column of its own, so every
+   * field runs the full width. It sits on the field's own fill, so the value
+   * under it is covered cleanly rather than showing through.
+   */
+  .row > .copy {
+    position: absolute;
+    top: 50%;
+    right: 3px;
+    transform: translateY(-50%);
+    background: var(--bg-sunk);
+  }
+  .row > .copy:hover { background: var(--bg-raised); }
+
+  /* Revert is always shown on an edited row, so it keeps a column of its own
+     rather than permanently covering the end of the value it would restore. */
+  .row:has(> .revert) { grid-template-columns: 76px minmax(0, 1fr) auto; }
+  .row > .copy.revert {
+    position: static;
+    transform: none;
+    background: transparent;
+    /* Beats the hover-reveal below: an edit's way back is never hidden. */
+    opacity: 1;
+  }
+
+  /* While a value is being typed, the field is the input; nothing sits on it. */
+  .row:has(.edit-input) > .copy { display: none; }
+  .row-value > .edit-input {
+    width: calc(100% + 12px);
+    height: 22px;
+    margin: -2px -6px;
+    padding: 0 5px;
+    border-radius: 5px;
+  }
 
   .row-label {
     font-size: 11px;
@@ -891,14 +1174,27 @@ export const PANEL_STYLES = `
     align-items: center;
     gap: 2px 6px;
     min-width: 0;
+    min-height: 22px;
+    padding: 2px 6px;
+    border-radius: 5px;
+    background: var(--bg-sunk);
   }
 
-  /* Values are single tokens — a hex code or a length. Breaking one across
-     two lines makes it unreadable and un-copyable by eye, so wrap the whole
-     token to the next line instead. Genuinely long values (URLs, shadow
-     longhands) opt into breaking. */
-  .row-value > span { white-space: nowrap; }
-  .row-value > span.wrap { white-space: normal; overflow-wrap: anywhere; }
+  /* A token — a hex code, a length — never breaks inside itself: wrapping
+     happens only at the spaces of a composite value like "1px solid #ccc",
+     which is where a reader expects it. Genuinely long values (URLs, font
+     stacks) opt into breaking anywhere. */
+  .row-value > span,
+  .row-value > .editable > span { white-space: normal; overflow-wrap: normal; }
+  .row-value > span.wrap,
+  .row-value > .editable > span.wrap { overflow-wrap: anywhere; }
+  /*
+   * The colour well stays on the value's line; the value beside it wraps its
+   * own detail instead. Wrapping the whole group left a lone swatch on one
+   * line and the hex on the next.
+   */
+  .row-value:has(> .color-well) { flex-wrap: nowrap; }
+  .row-value > .editable { flex-wrap: wrap; row-gap: 0; }
 
   .row-detail {
     color: var(--ink-mute);
@@ -908,8 +1204,7 @@ export const PANEL_STYLES = `
   }
 
   .copy {
-    font-family: var(--mono);
-    font-size: 9.5px;
+    font-size: 10.5px;
     color: var(--ink-mute);
     padding: 1px 4px;
   }
@@ -922,7 +1217,7 @@ export const PANEL_STYLES = `
    * not exist.
    */
   .row .copy { opacity: 0; }
-  .row:hover .copy, .row .copy:focus-visible { opacity: 1; }
+  .row:hover .copy, .row:focus-within .copy { opacity: 1; }
   /* Nothing to hover with: a reveal-on-hover control would never appear. */
   @media (hover: none) {
     .row .copy, .asset .copy { opacity: 1; }
@@ -937,17 +1232,17 @@ export const PANEL_STYLES = `
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    padding: 6px 10px;
+    padding: 6px 10px 6px 12px;
     border-top: 1px solid var(--rule);
-    background: var(--bg-raised);
-    font-family: var(--mono);
-    font-size: 9.5px;
-    letter-spacing: 0.02em;
+    font-size: 10.5px;
   }
 
   .foot-name { color: var(--ink-mute); }
 
   .foot-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
     color: var(--ink-mute);
     text-decoration: none;
     padding: 2px 4px;
@@ -959,14 +1254,14 @@ export const PANEL_STYLES = `
   /* ---------- sampling and auditing ---------- */
 
   .sample-btn {
-    font-family: var(--mono);
-    font-size: 10px;
-    letter-spacing: 0.03em;
-    color: var(--accent);
-    border-color: var(--accent);
-    padding: 4px 9px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ink);
+    background: var(--bg-sunk);
+    padding: 4px 10px;
+    border-radius: 6px;
   }
-  .sample-btn:hover { background: var(--accent-wash); }
+  .sample-btn:hover { border-color: var(--rule-strong); }
 
   /*
    * One failing sample, as a row you can press.
@@ -982,10 +1277,19 @@ export const PANEL_STYLES = `
     width: 100%;
     text-align: left;
     padding: 5px 6px;
-    border-radius: 4px;
+    border-radius: 6px;
     border: 1px solid transparent;
   }
-  .finding:hover { background: var(--bg-sunk); border-color: var(--rule); }
+  .finding:hover { background: var(--bg-sunk); }
+  /* Says what pressing does, on the row about to be pressed. */
+  .finding::after {
+    content: 'Select';
+    flex: none;
+    font-size: 10.5px;
+    color: var(--ink-mute);
+    opacity: 0;
+  }
+  .finding:hover::after, .finding:focus-visible::after { opacity: 1; }
 
   .finding-ratio {
     flex: none;
@@ -994,15 +1298,15 @@ export const PANEL_STYLES = `
     font-size: 10px;
     font-variant-numeric: tabular-nums;
     padding: 2px 5px;
-    border-radius: 3px;
+    border-radius: 5px;
     text-align: center;
   }
   .finding[data-severity='critical'] .finding-ratio {
-    background: color-mix(in srgb, var(--risk) 18%, transparent);
+    background: color-mix(in srgb, var(--risk) 10%, transparent);
     color: var(--risk);
   }
   .finding[data-severity='serious'] .finding-ratio {
-    background: color-mix(in srgb, var(--warn) 18%, transparent);
+    background: color-mix(in srgb, var(--warn) 10%, transparent);
     color: var(--warn);
   }
   .finding[data-severity='moderate'] .finding-ratio {
@@ -1014,8 +1318,8 @@ export const PANEL_STYLES = `
 
   .finding-label {
     font-family: var(--mono);
-    font-size: 10px;
-    color: var(--accent);
+    font-size: 10.5px;
+    color: var(--ink);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1043,13 +1347,6 @@ export const PANEL_STYLES = `
     height: 12px;
     border-radius: 2px;
     flex: none;
-    background-image:
-      linear-gradient(45deg, var(--sunk) 25%, transparent 25%),
-      linear-gradient(-45deg, var(--sunk) 25%, transparent 25%),
-      linear-gradient(45deg, transparent 75%, var(--sunk) 75%),
-      linear-gradient(-45deg, transparent 75%, var(--sunk) 75%);
-    background-size: 6px 6px;
-    background-position: 0 0, 0 3px, 3px -3px, -3px 0;
     border: 1px solid var(--rule-strong);
     background-image:
       linear-gradient(45deg, #888 25%, transparent 25%, transparent 75%, #888 75%),
@@ -1065,41 +1362,43 @@ export const PANEL_STYLES = `
     display: flex;
     align-items: center;
     gap: 5px;
-    padding: 3px 6px 3px 4px;
-    background: var(--bg-raised);
-    border: 1px solid var(--rule);
-    border-radius: 3px;
+    padding: 3px 7px 3px 4px;
+    background: var(--bg-sunk);
+    border: 1px solid transparent;
+    border-radius: 5px;
     font-family: var(--mono);
     font-size: 10.5px;
     cursor: pointer;
     color: var(--ink);
   }
-  .chip:hover { border-color: var(--ink-mute); }
+  .chip:hover { border-color: var(--rule-strong); }
   .chip .count { color: var(--ink-mute); font-size: 9.5px; }
 
   /* ---------- misc ---------- */
 
   .empty {
+    margin: 0;
     font-size: 11px;
+    line-height: 1.5;
     color: var(--ink-mute);
-    padding: 10px 4px;
+    padding: 2px 0;
     font-style: normal;
   }
 
+  /* A pill on its own wash: the colour is the verdict, the fill just holds it. */
   .badge {
     display: inline-flex;
     align-items: center;
-    padding: 1px 5px;
-    border-radius: 2px;
-    font-family: var(--mono);
-    font-size: 9.5px;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    border: 1px solid currentColor;
+    padding: 1px 7px;
+    border-radius: 99px;
+    font-family: var(--sans);
+    font-size: 10px;
+    font-weight: 600;
+    white-space: nowrap;
   }
-  .badge.pass { color: var(--good); }
-  .badge.fail { color: var(--risk); }
-  .badge.unknown { color: var(--warn); }
+  .badge.pass { color: var(--good); background: color-mix(in srgb, var(--good) 13%, transparent); }
+  .badge.fail { color: var(--risk); background: color-mix(in srgb, var(--risk) 12%, transparent); }
+  .badge.unknown { color: var(--warn); background: color-mix(in srgb, var(--warn) 13%, transparent); }
 
   .meter {
     height: 4px;
@@ -1107,14 +1406,14 @@ export const PANEL_STYLES = `
     border-radius: 2px;
     overflow: hidden;
   }
-  .meter > span { display: block; height: 100%; background: var(--accent); }
+  /* Neutral: a conformance figure is a reading, and accent means "changed". */
+  .meter > span { display: block; height: 100%; border-radius: 2px; background: var(--ink-soft); }
 
   pre {
     margin: 0;
     padding: 8px 10px;
     background: var(--bg-sunk);
-    border: 1px solid var(--rule);
-    border-radius: 4px;
+    border-radius: 6px;
     font-family: var(--mono);
     font-size: 10.5px;
     line-height: 1.55;
@@ -1125,38 +1424,41 @@ export const PANEL_STYLES = `
     white-space: pre;
   }
 
+  pre + .empty { margin-top: 4px; }
+
   .export-actions { display: flex; flex-wrap: wrap; gap: 4px; }
 
   .export-actions button {
-    font-family: var(--mono);
-    font-size: 10px;
-    border-color: var(--rule);
+    font-size: 11px;
     color: var(--ink-soft);
-    padding: 4px 7px;
+    background: var(--bg-sunk);
+    padding: 3px 9px;
   }
+  .export-actions button:hover { color: var(--ink); }
+  /* Chosen, not changed: the same tint as every other pressed toggle. */
   .export-actions button[aria-pressed='true'] {
-    color: var(--bg);
-    background: var(--accent);
-    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-wash);
+    font-weight: 600;
   }
 
+  /* Read like source: a raised block, selector on top, no box inside a box. */
   .rule-block {
-    border: 1px solid var(--rule);
-    border-radius: 4px;
+    border-radius: 6px;
+    background: var(--bg-raised);
     overflow: hidden;
   }
   .rule-head {
     display: flex;
     justify-content: space-between;
     gap: 8px;
-    padding: 5px 8px;
-    background: var(--bg-raised);
+    padding: 6px 8px 2px;
     font-family: var(--mono);
     font-size: 10.5px;
   }
   .rule-selector { color: var(--accent); word-break: break-all; }
   .rule-source { color: var(--ink-mute); flex: none; font-size: 9.5px; }
-  .decls { padding: 5px 8px; display: flex; flex-direction: column; gap: 2px; }
+  .decls { padding: 2px 8px 7px 18px; display: flex; flex-direction: column; gap: 2px; }
   .decl {
     font-family: var(--mono);
     font-size: 10.5px;

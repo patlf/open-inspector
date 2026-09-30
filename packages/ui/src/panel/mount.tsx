@@ -1,4 +1,5 @@
 import { render } from 'preact';
+import { lockHost, raiseToTopLayer } from '../host.js';
 import { Panel } from './Panel.jsx';
 import { EditingContext, type EditingApi } from './editing.jsx';
 import { PANEL_STYLES } from './panel-styles.js';
@@ -15,6 +16,10 @@ export interface PanelHandle {
   setPinned(pinned: boolean): void;
   /** Reflect whether the picker is armed. */
   setPicking(picking: boolean): void;
+  /** Ask before closing: the number of edits closing would revert, or null. */
+  setConfirmClose(pending: number | null): void;
+  /** Move back above anything that entered the top layer after us. */
+  raise(): void;
   /** True if the element belongs to the panel — used to avoid inspecting ourselves. */
   owns(element: Element): boolean;
   destroy(): void;
@@ -23,6 +28,8 @@ export interface PanelHandle {
 export interface PanelOptions {
   doc?: Document;
   onClose: () => void;
+  /** The close confirmation was dismissed. */
+  onCancelClose?: () => void;
   onPinnedChange?: (pinned: boolean) => void;
   /** The Inspect button was pressed. */
   onTogglePicking?: () => void;
@@ -61,9 +68,7 @@ function lockHostGeometry(host: HTMLElement): void {
     visibility: 'visible',
   };
 
-  for (const [property, value] of Object.entries(rules)) {
-    host.style.setProperty(property, value, 'important');
-  }
+  lockHost(host, rules);
 }
 
 function applyStyles(shadow: ShadowRoot): void {
@@ -105,12 +110,14 @@ export function createPanel(options: PanelOptions): PanelHandle {
   let pinned = false;
   let picking = true;
   let side: 'left' | 'right' = 'right';
+  let confirmClose: number | null = null;
   let attached = false;
 
   function paint(): void {
     if (!attached || !host.isConnected) {
       doc.documentElement.appendChild(host);
       attached = true;
+      raiseToTopLayer(host as HTMLElement);
     }
 
     render(
@@ -128,6 +135,8 @@ export function createPanel(options: PanelOptions): PanelHandle {
           paint();
         }}
         onClose={options.onClose}
+        confirmClose={confirmClose}
+        onCancelClose={() => options.onCancelClose?.()}
       />
       </EditingContext.Provider>,
       root,
@@ -151,6 +160,14 @@ export function createPanel(options: PanelOptions): PanelHandle {
     setPicking(next) {
       picking = next;
       paint();
+    },
+    setConfirmClose(next) {
+      if (confirmClose === next) return;
+      confirmClose = next;
+      paint();
+    },
+    raise() {
+      if (attached && host.isConnected) raiseToTopLayer(host as HTMLElement);
     },
     owns(element) {
       return element === host || host.contains(element);

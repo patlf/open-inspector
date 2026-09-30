@@ -112,26 +112,27 @@ export function BoxDiagram({ box }: { box: BoxModel }) {
 /** Styles for the diagram, appended to the panel stylesheet. */
 export const BOX_DIAGRAM_STYLES = `
   .boxdiagram {
+    /* Past this it is just more coloured band; the numbers stay put. */
+    max-width: 420px;
     font-family: var(--mono);
     font-size: 9.5px;
     font-variant-numeric: tabular-nums;
-    color: var(--ink);
+    color: var(--bd-ink);
     user-select: none;
   }
 
   .bd-layer {
     position: relative;
     display: grid;
-    grid-template-columns: 30px 1fr 30px;
-    grid-template-rows: 18px auto 18px;
+    grid-template-columns: 26px 1fr 26px;
+    grid-template-rows: 16px auto 16px;
     grid-template-areas:
       '.  t  .'
       'l  c  r'
       '.  b  .';
     align-items: center;
     justify-items: center;
-    border: 1px solid var(--rule);
-    border-radius: 3px;
+    border-radius: 5px;
     padding: 0;
   }
 
@@ -142,11 +143,16 @@ export const BOX_DIAGRAM_STYLES = `
   .bd-b { grid-area: b; }
   .bd-l { grid-area: l; }
 
-  .bd-t, .bd-r, .bd-b, .bd-l { color: #14181c; }
-  [data-zero='true'] { opacity: 0.45; }
+  .bd-t, .bd-r, .bd-b, .bd-l { color: var(--bd-ink); }
+  /*
+   * Receded, not faded. Opacity took zeros to 2.7:1 on the fills — below the
+   * AA line the panel grades every other page against. A softer ink that
+   * clears 4.5:1 on every fill still reads as "measured, and zero".
+   */
+  [data-zero='true'] { color: var(--bd-zero); font-weight: 400; }
 
-  /* The diagram sits on light fills, so its editable cells need their own
-     colours rather than the panel's — the shared ones vanish on orange. */
+  /* The diagram sits on its own fills, so its editable cells take their
+     colours from the diagram's ink rather than the panel's. */
   .boxdiagram .editable {
     padding: 0 3px;
     margin: 0;
@@ -154,13 +160,13 @@ export const BOX_DIAGRAM_STYLES = `
     cursor: text;
   }
   .boxdiagram .editable:hover {
-    background: rgba(255, 255, 255, 0.55);
-    border-color: rgba(20, 24, 28, 0.35);
+    background: color-mix(in srgb, var(--bg) 55%, transparent);
+    border-color: color-mix(in srgb, var(--bd-ink) 35%, transparent);
   }
   .boxdiagram .editable[data-edited='true'] {
-    color: #14181c;
-    background: rgba(255, 255, 255, 0.75);
-    border-color: #14181c;
+    color: var(--bd-ink);
+    background: color-mix(in srgb, var(--bg) 75%, transparent);
+    border-color: var(--bd-ink);
     font-weight: 600;
   }
 
@@ -170,50 +176,40 @@ export const BOX_DIAGRAM_STYLES = `
     margin: 0;
     font-size: 9.5px;
     text-align: center;
-    background: #fff;
-    color: #14181c;
-    border-color: #14181c;
+    background: var(--bg);
+    color: var(--ink);
+    border-color: var(--bd-ink);
   }
 
   .bd-name {
     position: absolute;
     top: 2px;
-    left: 5px;
-    font-size: 9px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    /*
-     * Full strength, and always the dark ink.
-     *
-     * The layer fills are the same pale DevTools colours in both themes, so
-     * the label colour must not follow the theme — it follows the fill. At
-     * 0.75 alpha it measured 2.9:1 against them.
-     */
-    color: #14181c;
+    left: 6px;
+    font-family: var(--sans);
+    font-size: 9.5px;
+    /* The fill's ink, not the theme's: see --bd-ink. */
+    color: var(--bd-ink);
   }
 
   /*
-   * Opaque, so the diagram is identical in both themes.
-   *
-   * As translucent fills these composited against the panel background, which
-   * meant the dark theme produced much darker bands — and the labels and edge
-   * numbers, which are always dark ink, dropped to 3.7:1 on them. These are
-   * the same colours, pre-composited over white.
+   * The DevTools mapping — orange margin, yellow border, green padding, blue
+   * content — at a lower strength, opaque and per theme (see --bd-margin).
    */
-  .bd-margin  { background: #fad5ae; }
-  .bd-border  { background: #feee9a; }
-  .bd-padding { background: #c4dfb8; }
+  .bd-margin  { background: var(--bd-margin); }
+  .bd-border  { background: var(--bd-border); }
+  .bd-padding { background: var(--bd-padding); }
 
   .bd-content {
     grid-area: c;
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 30px;
-    background: rgba(111, 168, 220, 0.6);
-    color: #14181c;
+    min-height: 24px;
+    border-radius: 3px;
+    background: var(--bd-content);
+    color: var(--bd-ink);
     font-weight: 600;
   }
 
-  .bd-content-size { padding: 4px 8px; }
+  .bd-content-size { padding: 3px 4px; white-space: nowrap; }
 `;

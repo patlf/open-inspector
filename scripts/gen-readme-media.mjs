@@ -2,11 +2,11 @@
 /**
  * Capture the raw images the README uses.
  *
- * Capture only — framing is a separate pass through the polished-screenshots
- * renderer, so the shadow, backdrop and corner radius are identical across
- * every image in the file. Both themes for each, because GitHub honours
- * `<picture>` with `prefers-color-scheme` and a light screenshot on a dark
- * README is a white rectangle in the middle of the page.
+ * Capture only — framing is a separate pass through shotkit, so the shadow,
+ * backdrop and corner radius are identical across every image in the file.
+ * Both themes for each, because GitHub honours `<picture>` with
+ * `prefers-color-scheme`, and a light screenshot on a dark README is a white
+ * rectangle in the middle of the page.
  *
  * Requires the site dev server: `pnpm site:dev`.
  */

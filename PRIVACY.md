@@ -51,9 +51,12 @@ build if any appear.
 
 Two behaviours sit close to this line and are worth stating exactly:
 
-- **Asset thumbnails** render the same URL the page has already loaded, so the
-  browser answers from its own cache. The extension issues no request and sends
-  nothing anywhere.
+- **Asset thumbnails** are only rendered for URLs the page has already
+  fetched (checked against the browser's own Resource Timing list), or for
+  inline `data:` and `blob:` content. The browser answers those from its own
+  cache. An asset the page only *references* — an `og:image`, an unused favicon
+  size, a prefetch hint — is listed with "not loaded by the page" instead of a
+  thumbnail, because showing it would be a request of ours.
 - **Saving an asset** hands the browser a link and lets the browser do what
   browsers do. Inline SVG and `data:` URIs never touch the network. A remote
   file costs one browser request — made by the browser, to a URL the page

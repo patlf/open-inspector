@@ -4,43 +4,74 @@ import { filterFields, useSearch } from './search.jsx';
 import type { Field } from './view-model.js';
 
 /**
- * Copy to clipboard without the async Clipboard API.
+ * Copy text, and report honestly whether it worked.
  *
- * `navigator.clipboard.writeText` requires the document to be focused and a
- * secure context, and content scripts frequently satisfy neither — the user is
- * clicking inside a shadow root on an http:// page. The execCommand fallback
- * is deprecated but is the only thing that works reliably here.
+ * Two routes, because neither works everywhere a content script runs:
+ *
+ * - `execCommand('copy')` is synchronous and needs no focus or secure
+ *   context, but from an extension's isolated world Chrome performs the copy
+ *   and still returns `false` — so the button never said "copied". The
+ *   `copy` event on the textarea is what gets trusted instead.
+ * - `navigator.clipboard.writeText` reports success properly, but only exists
+ *   on secure pages and needs the document focused.
+ *
+ * The textarea goes inside our own shadow root where the engine allows it, so
+ * a page's `copy` or `focusin` listeners never see it.
  */
-function copyText(text: string): boolean {
+function copyVia(container: Node, text: string): boolean {
   const textarea = document.createElement('textarea');
   textarea.value = text;
   textarea.setAttribute('readonly', '');
-  textarea.style.position = 'fixed';
-  textarea.style.top = '-1000px';
-  textarea.style.opacity = '0';
+  textarea.setAttribute('aria-hidden', 'true');
+  textarea.style.cssText = 'position:fixed;top:-1000px;opacity:0;';
 
-  document.body.appendChild(textarea);
+  // The copy event fires only when the copy really happens, which makes it a
+  // truthful signal where the return value is not.
+  let fired = false;
+  textarea.addEventListener('copy', () => {
+    fired = true;
+  });
+
+  container.appendChild(textarea);
   textarea.select();
-
-  let copied = false;
+  let returned = false;
   try {
-    copied = document.execCommand('copy');
+    returned = document.execCommand('copy');
   } catch {
-    copied = false;
+    returned = false;
   }
-
   textarea.remove();
-  return copied;
+  return returned || fired;
+}
+
+export async function copyText(text: string, near?: Node | null): Promise<boolean> {
+  // Our own shadow root first, so the page's listeners never see the text;
+  // the page's body if the engine will not select inside a shadow tree.
+  const root = near?.getRootNode();
+  if (root instanceof ShadowRoot && copyVia(root, text)) return true;
+  const body = document.body ?? document.documentElement;
+  if (body && copyVia(body, text)) return true;
+
+  try {
+    if (!navigator.clipboard) return false;
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function CopyButton({ text, label = 'copy' }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
 
-  const onClick = useCallback(() => {
-    if (!copyText(text)) return;
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1200);
-  }, [text]);
+  const onClick = useCallback(
+    async (event: MouseEvent) => {
+      if (!(await copyText(text, event.currentTarget as Node))) return;
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1200);
+    },
+    [text],
+  );
 
   return (
     <button

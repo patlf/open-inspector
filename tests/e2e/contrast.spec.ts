@@ -55,7 +55,8 @@ const MEASURE = `
 
     // Hover-reveal controls are measured as revealed; opacity 0 is not a
     // contrast failure, it is a hidden control.
-    const opacity = el.classList.contains('copy') ? 1 : Number(style.opacity);
+    const revealed = el.classList.contains('copy') || el.classList.contains('tab-label');
+    const opacity = revealed ? 1 : Number(style.opacity);
     let fg = parse(style.color);
     if (!fg) continue;
     fg = { ...fg, a: fg.a * opacity };
@@ -88,13 +89,21 @@ for (const scheme of ['light', 'dark'] as const) {
 
     const tabId = await activeTabId(serviceWorker);
     await toggleInspector(serviceWorker, tabId);
-    await page.waitForTimeout(200);
 
-    const box = await page.locator('#plain-button').boundingBox();
-    await page.mouse.move(box!.x + 5, box!.y + 5);
-    await page.waitForTimeout(100);
-    await page.mouse.click(box!.x + 5, box!.y + 5);
-    await page.waitForTimeout(500);
+    // CSS locators pierce the panel's open shadow root.
+    const panel = page.locator('open-inspector-panel');
+    await expect(panel.locator('.panel')).toBeVisible();
+
+    // Hover, let that frame paint, then pin: the hover render is what
+    // schedules the settled page scan, and the audit should see its results.
+    const button = page.locator('#plain-button');
+    await button.hover();
+    await expect(panel.locator('.selector')).toHaveText('button#plain-button');
+    await button.click();
+
+    // Measure the finished panel, not a half-painted one: the scan has landed
+    // once the toggles for states the page never styles go disabled.
+    await expect(panel.locator('.state-toggle').filter({ hasText: /^:focus$/ })).toBeDisabled();
 
     const rows = (await page.evaluate(MEASURE)) as Array<{
       cls: string; sample: string; px: number; ratio: number; need: number; pass: boolean;

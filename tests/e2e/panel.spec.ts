@@ -6,7 +6,7 @@ import {
   activeTabId,
   toggleInspector,
 } from './fixtures.js';
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 
 /**
  * The panel's own behaviour, driven through the real extension.
@@ -15,72 +15,78 @@ import type { Page } from '@playwright/test';
  * plumbing. These are about what the panel does once it is on screen — the
  * parts a unit test cannot reach, because they depend on a real cascade, real
  * computed styles and a real shadow tree.
+ *
+ * Nothing here sleeps. Every step waits on something the panel visibly does —
+ * a tab going selected, a row appearing, a computed style landing — so a slow
+ * machine makes the suite slower rather than red.
  */
 
-/** Reach into the panel's shadow root. It is open, unlike the overlay's. */
-function inPanel(page: Page, selector: string) {
-  return page.evaluate(
-    (css) =>
-      document.querySelector('open-inspector-panel')?.shadowRoot?.querySelector(css) ?? null,
-    selector,
-  );
+/**
+ * The panel host.
+ *
+ * Its shadow root is open, unlike the overlay's, and Playwright's CSS engine
+ * pierces open shadow roots — so `panel(page).locator('.row')` reaches inside
+ * and gets auto-waiting and real input for free.
+ */
+function panel(page: Page): Locator {
+  return page.locator('open-inspector-panel');
 }
 
-async function panelText(page: Page, selector: string): Promise<string | null> {
-  return page.evaluate(
-    (css) =>
-      document
-        .querySelector('open-inspector-panel')
-        ?.shadowRoot?.querySelector(css)
-        ?.textContent?.trim() ?? null,
-    selector,
-  );
+/** Text that is exactly `label` — so `:focus` does not also match `:focus-within`. */
+function exactly(label: string): RegExp {
+  return new RegExp(`^${label}$`);
 }
 
-async function clickInPanel(page: Page, selector: string, nth = 0): Promise<boolean> {
-  return page.evaluate(
-    ([css, index]) => {
-      const shadow = document.querySelector('open-inspector-panel')?.shadowRoot;
-      const target = shadow?.querySelectorAll(css as string)[index as number];
-      if (!(target instanceof HTMLElement)) return false;
-      target.click();
-      return true;
-    },
-    [selector, nth] as const,
-  );
-}
-
-/** Choose a tab by its visible label. */
+/** Choose a tab, and wait until the panel says it is showing it. */
 async function openTab(page: Page, label: string): Promise<void> {
-  const clicked = await page.evaluate((wanted) => {
-    const shadow = document.querySelector('open-inspector-panel')?.shadowRoot;
-    const tab = [...(shadow?.querySelectorAll('.tab') ?? [])].find(
-      (button) => button.textContent?.trim() === wanted,
-    );
-    if (!(tab instanceof HTMLElement)) return false;
-    tab.click();
-    return true;
-  }, label);
-
-  expect(clicked, `tab "${label}" should exist`).toBe(true);
-  await page.waitForTimeout(60);
+  // By id, not text: the Styles tab also carries a count once there are edits.
+  const tab = panel(page).locator(`#oi-tab-${label.toLowerCase()}`);
+  await tab.click();
+  await expect(tab).toHaveAttribute('aria-selected', 'true');
+  await expect(panel(page).locator('#oi-tabpanel')).toHaveAttribute(
+    'aria-labelledby',
+    `oi-tab-${label.toLowerCase()}`,
+  );
 }
 
-/** Pin an element by clicking it, so the panel stops following the pointer. */
+/**
+ * Pin an element by clicking it, so the panel stops following the pointer.
+ *
+ * Hover first and let that frame paint, as a person's pointer would. The
+ * settled page scan is scheduled by the hover render, not by the click, so a
+ * click that lands before any hover frame pins the element but never gets a
+ * scan — pseudo-state availability and the page-wide findings never arrive.
+ * The hover has painted once the panel leaves its onboarding screen for the
+ * element view.
+ */
 async function pin(page: Page, selector: string): Promise<void> {
-  const box = await page.locator(selector).first().boundingBox();
-  if (!box) throw new Error(`no box for ${selector}`);
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.waitForTimeout(80);
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-  await page.waitForTimeout(120);
+  const target = page.locator(selector).first();
+  await target.hover();
+  await expect(panel(page).locator('#oi-tabpanel')).toBeVisible();
+  // The inspector swallows the click before the page sees it, and turns it
+  // into a selection.
+  await target.click();
+}
+
+/**
+ * Wait for the settled page scan to land.
+ *
+ * It runs once the pointer stops, and working out which pseudo-states the
+ * page styles rides along with it. Until it lands every toggle advertises
+ * itself; after, the ones nothing styles go disabled. The fixture styles
+ * `:focus` nowhere, so that toggle going disabled is the scan arriving.
+ */
+async function waitForSettledScan(page: Page): Promise<void> {
+  await expect(
+    panel(page).locator('.state-toggle').filter({ hasText: exactly(':focus') }),
+  ).toBeDisabled();
 }
 
 async function open(page: Page, serviceWorker: Parameters<typeof activeTabId>[0]) {
   await page.goto(FIXTURE_URL, { waitUntil: 'domcontentloaded' });
   const tabId = await activeTabId(serviceWorker);
   expect((await toggleInspector(serviceWorker, tabId)).active).toBe(true);
-  await page.waitForTimeout(150);
+  await expect(panel(page).locator('.panel')).toBeVisible();
   return tabId;
 }
 
@@ -90,31 +96,20 @@ test.describe('panel search', () => {
     await open(page, serviceWorker);
     await pin(page, '.card');
 
-    const before = await page.evaluate(
-      () =>
-        document.querySelector('open-inspector-panel')?.shadowRoot?.querySelectorAll('.row')
-          .length ?? 0,
-    );
-    expect(before).toBeGreaterThan(5);
+    const rows = panel(page).locator('.row');
+    await expect.poll(() => rows.count()).toBeGreaterThan(5);
+    const before = await rows.count();
 
-    await page.evaluate(() => {
-      const shadow = document.querySelector('open-inspector-panel')?.shadowRoot;
-      const search = shadow?.querySelector('.search');
-      if (!(search instanceof HTMLInputElement)) throw new Error('no search box');
-      search.value = 'padding';
-      search.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-    await page.waitForTimeout(80);
+    await panel(page).locator('.search').fill('padding');
+    // The filtered render is the one that marks the body as searching.
+    await expect(panel(page).locator('#oi-tabpanel')).toHaveAttribute('data-searching', 'true');
 
-    const rows = await page.evaluate(() =>
-      [...(document.querySelector('open-inspector-panel')?.shadowRoot?.querySelectorAll('.row') ??
-        [])].map((row) => row.textContent ?? ''),
-    );
+    const texts = await rows.allTextContents();
 
-    expect(rows.length).toBeGreaterThan(0);
-    expect(rows.length).toBeLessThan(before);
+    expect(texts.length).toBeGreaterThan(0);
+    expect(texts.length).toBeLessThan(before);
     // Every surviving row mentions it somewhere — label, value or property.
-    for (const row of rows) expect(row.toLowerCase()).toContain('padding');
+    for (const row of texts) expect(row.toLowerCase()).toContain('padding');
   });
 
   test('hides the groups it emptied rather than leaving bare headings', async ({
@@ -125,29 +120,21 @@ test.describe('panel search', () => {
     await open(page, serviceWorker);
     await pin(page, '.card');
 
-    await page.evaluate(() => {
-      const shadow = document.querySelector('open-inspector-panel')?.shadowRoot;
-      const search = shadow?.querySelector('.search');
-      if (!(search instanceof HTMLInputElement)) throw new Error('no search box');
-      search.value = 'padding';
-      search.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-    await page.waitForTimeout(80);
+    await panel(page).locator('.search').fill('padding');
+    await expect(panel(page).locator('#oi-tabpanel')).toHaveAttribute('data-searching', 'true');
 
     // A group left holding only its own title must not be on screen.
-    const bareTitles = await page.evaluate(
-      () =>
-        [
-          ...(document
-            .querySelector('open-inspector-panel')
-            ?.shadowRoot?.querySelectorAll('.group') ?? []),
-        ].filter((group) => {
-          const meaningful = [...group.children].filter(
-            (child) => !child.classList.contains('group-title'),
-          );
-          return meaningful.length === 0 && getComputedStyle(group).display !== 'none';
-        }).length,
-    );
+    const bareTitles = await panel(page)
+      .locator('.group')
+      .evaluateAll(
+        (groups) =>
+          groups.filter((group) => {
+            const meaningful = [...group.children].filter(
+              (child) => !child.classList.contains('group-title'),
+            );
+            return meaningful.length === 0 && getComputedStyle(group).display !== 'none';
+          }).length,
+      );
 
     expect(bareTitles).toBe(0);
   });
@@ -163,20 +150,18 @@ test.describe('markup export', () => {
     await pin(page, '.card');
     await openTab(page, 'Markup');
 
-    const html = await panelText(page, 'pre');
-    expect(html).toBeTruthy();
-    expect(html).toContain('<article');
+    const source = panel(page).locator('pre');
+    await expect(source).toContainText('<article');
+
+    const html = await source.textContent();
     expect(html).toContain('class=');
     // The inspector must never appear in markup meant for someone's codebase.
     expect(html).not.toContain('open-inspector');
 
     // JSX is the same subtree in the other dialect.
-    await clickInPanel(page, '.export-actions button', 1);
-    await page.waitForTimeout(60);
-
-    const jsx = await panelText(page, 'pre');
-    expect(jsx).toContain('className=');
-    expect(jsx).not.toContain(' class=');
+    await panel(page).getByRole('button', { name: 'JSX', exact: true }).click();
+    await expect(source).toContainText('className=');
+    expect(await source.textContent()).not.toContain(' class=');
   });
 });
 
@@ -189,22 +174,18 @@ test.describe('hide element', () => {
     await open(page, serviceWorker);
     await pin(page, '.card');
 
-    const displayOf = () =>
-      page.evaluate(() => {
-        const element = document.querySelector('.card');
-        return element ? getComputedStyle(element).display : null;
-      });
+    const card = page.locator('.card').first();
+    const hide = panel(page).locator('.toolbar .hide-btn');
 
-    expect(await displayOf()).not.toBe('none');
+    await expect(card).not.toHaveCSS('display', 'none');
 
-    // The eye button is the only aria-pressed icon-btn in the toolbar.
-    expect(await clickInPanel(page, '.toolbar .icon-btn')).toBe(true);
-    await page.waitForTimeout(100);
-    expect(await displayOf()).toBe('none');
+    await hide.click();
+    await expect(hide).toHaveAttribute('aria-pressed', 'true');
+    await expect(card).toHaveCSS('display', 'none');
 
-    expect(await clickInPanel(page, '.toolbar .icon-btn')).toBe(true);
-    await page.waitForTimeout(100);
-    expect(await displayOf()).not.toBe('none');
+    await hide.click();
+    await expect(hide).toHaveAttribute('aria-pressed', 'false');
+    await expect(card).not.toHaveCSS('display', 'none');
   });
 
   test('leaves nothing behind when the inspector closes', async ({ context, serviceWorker }) => {
@@ -212,27 +193,16 @@ test.describe('hide element', () => {
     const tabId = await open(page, serviceWorker);
     await pin(page, '.card');
 
-    await clickInPanel(page, '.toolbar .icon-btn');
-    await page.waitForTimeout(100);
-    expect(
-      await page.evaluate(() => getComputedStyle(document.querySelector('.card')!).display),
-    ).toBe('none');
+    const card = page.locator('.card').first();
+    await panel(page).locator('.toolbar .hide-btn').click();
+    await expect(card).toHaveCSS('display', 'none');
 
     await toggleInspector(serviceWorker, tabId);
-    await page.waitForTimeout(150);
 
     // Not merely visible again — the style attribute we created must be gone,
     // down to not leaving an empty one behind.
-    const trace = await page.evaluate(() => {
-      const element = document.querySelector('.card')!;
-      return {
-        display: getComputedStyle(element).display,
-        hasStyleAttribute: element.hasAttribute('style'),
-      };
-    });
-
-    expect(trace.display).not.toBe('none');
-    expect(trace.hasStyleAttribute).toBe(false);
+    await expect(card).not.toHaveCSS('display', 'none');
+    await expect(card).not.toHaveAttribute('style');
   });
 });
 
@@ -243,46 +213,26 @@ test.describe('editing type and colour', () => {
     await pin(page, '.card');
     await openTab(page, 'Type');
 
-    const applied = await page.evaluate(() => {
-      const shadow = document.querySelector('open-inspector-panel')?.shadowRoot;
-      const rows = [...(shadow?.querySelectorAll('.row') ?? [])];
-      const row = rows.find((candidate) =>
-        candidate.querySelector('.row-label')?.textContent?.trim() === 'size',
-      );
-      const trigger = row?.querySelector('.editable');
-      if (!(trigger instanceof HTMLElement)) return 'no editable size row';
-      trigger.click();
-      return 'opened';
-    });
-    expect(applied).toBe('opened');
-    await page.waitForTimeout(60);
+    const size = panel(page)
+      .locator('.row')
+      .filter({ has: page.locator('.row-label', { hasText: exactly('size') }) })
+      .first();
+    await size.locator('.editable').click();
 
-    await page.evaluate(() => {
-      const shadow = document.querySelector('open-inspector-panel')?.shadowRoot;
-      const input = shadow?.querySelector('.edit-input');
-      if (!(input instanceof HTMLInputElement)) throw new Error('no input');
-      input.value = '31px';
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-    });
+    /**
+     * Real keystrokes, not synthesised events.
+     *
+     * Preact re-renders asynchronously, so an `input` event and an Enter
+     * keydown dispatched in one synchronous block ran the keydown handler from
+     * the render *before* the typing — still closed over the old draft, so it
+     * committed nothing. `fill` and `press` are separate trips to the browser,
+     * with the re-render between them, exactly as for someone typing.
+     */
+    const input = panel(page).locator('.edit-input');
+    await input.fill('31px');
+    await input.press('Enter');
 
-    // Enter has to land in a later frame. Preact re-renders asynchronously, so
-    // dispatching both in one synchronous block would run the keydown handler
-    // from the render before the typing — which still closes over the old
-    // draft, and commits nothing. A real keystroke always has a repaint
-    // between it and the last one.
-    await page.waitForTimeout(80);
-
-    await page.evaluate(() => {
-      const shadow = document.querySelector('open-inspector-panel')?.shadowRoot;
-      const input = shadow?.querySelector('.edit-input');
-      if (!(input instanceof HTMLInputElement)) throw new Error('input closed early');
-      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-    });
-    await page.waitForTimeout(120);
-
-    expect(
-      await page.evaluate(() => getComputedStyle(document.querySelector('.card')!).fontSize),
-    ).toBe('31px');
+    await expect(page.locator('.card').first()).toHaveCSS('font-size', '31px');
   });
 
   test('a colour row offers a picker seeded with its current value', async ({
@@ -294,17 +244,10 @@ test.describe('editing type and colour', () => {
     await pin(page, '.card');
     await openTab(page, 'Color');
 
-    const well = await page.evaluate(() => {
-      const shadow = document.querySelector('open-inspector-panel')?.shadowRoot;
-      const input = shadow?.querySelector('.color-well');
-      if (!(input instanceof HTMLInputElement)) return null;
-      return { type: input.type, value: input.value };
-    });
-
-    expect(well).not.toBeNull();
-    expect(well?.type).toBe('color');
+    const well = panel(page).locator('.color-well').first();
+    await expect(well).toHaveAttribute('type', 'color');
     // Seeded from the page, not left at the control's default black.
-    expect(well?.value).toMatch(/^#[0-9a-f]{6}$/);
+    await expect(well).toHaveValue(/^#[0-9a-f]{6}$/);
   });
 });
 
@@ -314,26 +257,18 @@ test.describe('the panel collapses', () => {
     await open(page, serviceWorker);
     await pin(page, '.card');
 
-    expect(await inPanel(page, '.panel')).not.toBeNull();
+    const body = panel(page).locator('.panel');
+    const edgeTab = panel(page).locator('.panel-tab');
+    await expect(body).toBeVisible();
 
-    // The collapse control is the last icon button in the header row.
-    await page.evaluate(() => {
-      const shadow = document.querySelector('open-inspector-panel')?.shadowRoot;
-      const buttons = [...(shadow?.querySelectorAll('.head-actions .icon-btn') ?? [])];
-      const collapse = buttons.find((button) =>
-        button.getAttribute('title')?.startsWith('Collapse'),
-      );
-      if (!(collapse instanceof HTMLElement)) throw new Error('no collapse button');
-      collapse.click();
-    });
-    await page.waitForTimeout(80);
+    // The collapse control is the header icon button whose title says so.
+    await panel(page).locator('.head-actions .icon-btn[title^="Collapse"]').click();
 
-    expect(await inPanel(page, '.panel')).toBeNull();
-    expect(await inPanel(page, '.panel-tab')).not.toBeNull();
+    await expect(body).toHaveCount(0);
+    await expect(edgeTab).toBeVisible();
 
-    await clickInPanel(page, '.panel-tab');
-    await page.waitForTimeout(80);
-    expect(await inPanel(page, '.panel')).not.toBeNull();
+    await edgeTab.click();
+    await expect(body).toBeVisible();
   });
 });
 
@@ -354,20 +289,8 @@ test.describe('responsive preview', () => {
     const page = await context.newPage();
     const tabId = await open(page, serviceWorker);
     await pin(page, '.card');
-
-    /**
-     * Start from bounds the API will accept.
-     *
-     * Chrome refuses any `windows.update` whose bounds fall more than half
-     * outside the visible screen, and the window Playwright creates is wide
-     * enough on this display to trip that on the way back. Shrinking first
-     * keeps the test about the feature rather than about the CI display.
-     */
-    await serviceWorker.evaluate(async (id) => {
-      const tab = await chrome.tabs.get(id as number);
-      await chrome.windows.update(tab.windowId!, { state: 'normal', width: 900, height: 700 });
-    }, tabId);
-    await page.waitForTimeout(200);
+    // The presets live with the breakpoints they exist to test.
+    await openTab(page, 'Layout');
 
     /**
      * Measured through the browser, not through `window.innerWidth`.
@@ -384,19 +307,25 @@ test.describe('responsive preview', () => {
         return win.width ?? 0;
       }, tabId);
 
-    const before = await windowWidth();
-    expect(before).toBe(900);
+    /**
+     * Start from bounds the API will accept.
+     *
+     * Chrome refuses any `windows.update` whose bounds fall more than half
+     * outside the visible screen, and the window Playwright creates is wide
+     * enough on this display to trip that on the way back. Shrinking first
+     * keeps the test about the feature rather than about the CI display.
+     */
+    await serviceWorker.evaluate(async (id) => {
+      const tab = await chrome.tabs.get(id as number);
+      await chrome.windows.update(tab.windowId!, { state: 'normal', width: 900, height: 700 });
+    }, tabId);
+    await expect.poll(windowWidth).toBe(900);
+    const before = 900;
 
-    const clicked = await page.evaluate(() => {
-      const shadow = document.querySelector('open-inspector-panel')?.shadowRoot;
-      const button = [...(shadow?.querySelectorAll('.viewport-btn') ?? [])].find(
-        (candidate) => candidate.textContent?.trim() === '375',
-      );
-      if (!(button instanceof HTMLElement)) return false;
-      button.click();
-      return true;
-    });
-    expect(clicked, 'the 375 preset should be offered inside the extension').toBe(true);
+    const presets = panel(page).locator('.viewport-btn');
+    const narrow = presets.filter({ hasText: exactly('375') });
+    await expect(narrow, 'the 375 preset should be offered inside the extension').toBeVisible();
+    await narrow.click();
 
     // Every platform enforces a minimum window width — around 570px on macOS
     // — so 375 is a request, not a guarantee. What must be true is that the
@@ -412,21 +341,12 @@ test.describe('responsive preview', () => {
      * back out of a 375px window. It now says the page is covered and offers
      * the collapse instead.
      */
-    expect(await inPanel(page, '.panel')).not.toBeNull();
-    expect(await inPanel(page, '.panel-tab')).toBeNull();
-    expect(await inPanel(page, '.coverage-hint')).not.toBeNull();
+    await expect(panel(page).locator('.coverage-hint')).toBeVisible();
+    await expect(panel(page).locator('.panel')).toBeVisible();
+    await expect(panel(page).locator('.panel-tab')).toHaveCount(0);
 
     // "auto" puts back the size we found, not some remembered default.
-    const restored = await page.evaluate(() => {
-      const shadow = document.querySelector('open-inspector-panel')?.shadowRoot;
-      const button = [...(shadow?.querySelectorAll('.viewport-btn') ?? [])].find(
-        (candidate) => candidate.textContent?.trim() === 'auto',
-      );
-      if (!(button instanceof HTMLElement)) return false;
-      button.click();
-      return true;
-    });
-    expect(restored).toBe(true);
+    await presets.filter({ hasText: exactly('auto') }).click();
 
     await expect.poll(windowWidth, { timeout: 4000 }).toBe(before);
   });
@@ -452,47 +372,32 @@ test.describe('force-state toggles', () => {
 
     await pin(page, '#plain-button');
     // The availability scan rides along with the settled page scan.
-    await page.waitForTimeout(400);
+    await waitForSettledScan(page);
 
-    const readToggle = () =>
-      page.evaluate(() => {
-        const shadow = document.querySelector('open-inspector-panel')!.shadowRoot!;
-        const button = [...shadow.querySelectorAll('.state-toggle')].find(
-          (candidate) => candidate.textContent === ':hover',
-        ) as HTMLButtonElement | undefined;
-        if (!button) return null;
-
-        const style = getComputedStyle(button);
-        return {
-          pressed: button.getAttribute('aria-pressed'),
-          disabled: button.disabled,
-          color: style.color,
-          background: style.backgroundColor,
-          opacity: Number(style.opacity),
-        };
-      });
+    const hover = panel(page).locator('.state-toggle').filter({ hasText: exactly(':hover') });
 
     // The page styles :hover, so the toggle must be usable from the start —
     // no click needed to discover that.
-    expect((await readToggle())?.disabled).toBe(false);
+    await expect(hover).toBeEnabled();
 
-    await page.evaluate(() => {
-      const shadow = document.querySelector('open-inspector-panel')!.shadowRoot!;
-      const button = [...shadow.querySelectorAll('.state-toggle')].find(
-        (candidate) => candidate.textContent === ':hover',
-      ) as HTMLButtonElement | undefined;
-      button?.click();
-    });
-    await page.waitForTimeout(150);
+    await hover.click();
+    await expect(hover).toHaveAttribute('aria-pressed', 'true');
 
-    const forced = await readToggle();
-    expect(forced?.pressed).toBe('true');
     // Releasable: a forced state is never disabled, whatever the scan concluded.
-    expect(forced?.disabled).toBe(false);
+    await expect(hover).toBeEnabled();
+
+    const forced = await hover.evaluate((button) => {
+      const style = getComputedStyle(button);
+      return {
+        color: style.color,
+        background: style.backgroundColor,
+        opacity: Number(style.opacity),
+      };
+    });
     // Legible: an opaque, filled chip rather than white-on-white.
-    expect(forced?.opacity).toBe(1);
-    expect(forced?.background).not.toBe('rgba(0, 0, 0, 0)');
-    expect(forced?.background).not.toBe(forced?.color);
+    expect(forced.opacity).toBe(1);
+    expect(forced.background).not.toBe('rgba(0, 0, 0, 0)');
+    expect(forced.background).not.toBe(forced.color);
   });
 
   test('report honestly which states the page styles, before being pressed', async ({
@@ -502,20 +407,12 @@ test.describe('force-state toggles', () => {
     const page = await context.newPage();
     await open(page, serviceWorker);
     await pin(page, '#plain-button');
-    await page.waitForTimeout(400);
 
     // This fixture styles no pseudo-states at all. Every toggle saying so up
     // front beats every toggle claiming to work and then not.
-    const states = await page.evaluate(() =>
-      [
-        ...document.querySelector('open-inspector-panel')!.shadowRoot!.querySelectorAll(
-          '.state-toggle',
-        ),
-      ].map((button) => (button as HTMLButtonElement).disabled),
-    );
-
-    expect(states.length).toBeGreaterThan(0);
-    expect(states.every(Boolean)).toBe(true);
+    const toggles = panel(page).locator('.state-toggle');
+    await expect.poll(() => toggles.count()).toBeGreaterThan(0);
+    await expect(toggles.and(page.locator(':enabled'))).toHaveCount(0);
   });
 });
 
@@ -544,44 +441,22 @@ staleWorkerTest.describe('when the background worker is stale', () => {
       });
       await chrome.tabs.sendMessage(id as number, { type: 'open-inspector:toggle' });
     }, tabId);
-    await page.waitForTimeout(300);
+    await expect(panel(page).locator('.panel')).toBeVisible();
 
     await pin(page, '.card');
+    await openTab(page, 'Layout');
 
-    await page.evaluate(() => {
-      const shadow = document.querySelector('open-inspector-panel')!.shadowRoot!;
-      const preset = [...shadow.querySelectorAll('.viewport-btn')].find(
-        (button) => button.textContent?.trim() === '768',
-      );
-      (preset as HTMLElement | undefined)?.click();
-    });
+    await panel(page).locator('.viewport-btn').filter({ hasText: exactly('768') }).click();
 
     // Longer than the deadline the content script puts on the round trip.
-    await expect
-      .poll(
-        () =>
-          page.evaluate(
-            () =>
-              document
-                .querySelector('open-inspector-panel')
-                ?.shadowRoot?.querySelector('.viewport-actual')
-                ?.textContent ?? null,
-          ),
-        { timeout: 8000 },
-      )
-      .toBe('refused');
+    await expect(panel(page).locator('.viewport-actual')).toHaveText('refused', {
+      timeout: 8000,
+    });
 
-    const hint = await page.evaluate(
-      () =>
-        document
-          .querySelector('open-inspector-panel')
-          ?.shadowRoot?.querySelector('.coverage-hint[data-error="true"]')
-          ?.textContent ?? '',
-    );
-
-    expect(hint).toContain('did not answer');
+    const hint = panel(page).locator('.coverage-hint[data-error="true"]');
+    await expect(hint).toContainText('did not answer');
     // And it names the fix, rather than leaving the user to guess.
-    expect(hint).toContain('chrome://extensions');
+    await expect(hint).toContainText('chrome://extensions');
   });
 });
 
@@ -617,49 +492,27 @@ test.describe('page-wide contrast audit', () => {
     });
 
     await pin(page, '.card');
+    /**
+     * Let the settled scan land before asking for the audit.
+     *
+     * The style tag above changed the stylesheet count since activation, and
+     * the settled scan reads that as a new page and drops its caches — the
+     * audit included. An audit run inside that window is thrown away moments
+     * after it renders.
+     */
+    await waitForSettledScan(page);
     await openTab(page, 'Color');
 
-    await page.evaluate(() => {
-      const shadow = document.querySelector('open-inspector-panel')!.shadowRoot!;
-      const button = [...shadow.querySelectorAll('.sample-btn')].find((candidate) =>
-        candidate.textContent?.includes('Scan'),
-      );
-      (button as HTMLElement | undefined)?.click();
-    });
-
-    await expect
-      .poll(
-        () =>
-          page.evaluate(
-            () =>
-              document.querySelector('open-inspector-panel')?.shadowRoot?.querySelectorAll(
-                '.finding',
-              ).length ?? 0,
-          ),
-        { timeout: 8000 },
-      )
-      .toBeGreaterThan(0);
-
-    const findings = await page.evaluate(() =>
-      [
-        ...document.querySelector('open-inspector-panel')!.shadowRoot!.querySelectorAll('.finding'),
-      ].map((row) => row.textContent ?? ''),
-    );
+    await panel(page).locator('.sample-btn').filter({ hasText: 'Scan' }).click();
 
     // #bbbbbb on white is about 1.9:1 — it must be in there.
-    expect(findings.join(' ')).toContain('contrast-victim');
+    const victim = panel(page).locator('.finding').filter({ hasText: 'contrast-victim' });
+    await expect(victim.first()).toBeVisible({ timeout: 8000 });
 
     // Pressing a finding selects that element, which is the point of the list.
-    await page.evaluate(() => {
-      const shadow = document.querySelector('open-inspector-panel')!.shadowRoot!;
-      const row = [...shadow.querySelectorAll('.finding')].find((candidate) =>
-        candidate.textContent?.includes('contrast-victim'),
-      );
-      (row as HTMLElement | undefined)?.click();
-    });
-    await page.waitForTimeout(300);
+    await victim.first().click();
 
-    expect(await panelText(page, '.selector')).toContain('contrast-victim');
+    await expect(panel(page).locator('.selector')).toContainText('contrast-victim');
   });
 
   test('never audits the inspector itself', async ({ context, serviceWorker }) => {
@@ -668,25 +521,16 @@ test.describe('page-wide contrast audit', () => {
     const page = await context.newPage();
     await open(page, serviceWorker);
     await pin(page, '.card');
+    // As above: an audit run before the settled scan can be discarded by it.
+    await waitForSettledScan(page);
     await openTab(page, 'Color');
 
-    await page.evaluate(() => {
-      const shadow = document.querySelector('open-inspector-panel')!.shadowRoot!;
-      const button = [...shadow.querySelectorAll('.sample-btn')].find((candidate) =>
-        candidate.textContent?.includes('Scan'),
-      );
-      (button as HTMLElement | undefined)?.click();
-    });
-    await page.waitForTimeout(1200);
+    const scan = panel(page).locator('.sample-btn').filter({ hasText: 'Scan' });
+    await scan.click();
+    // The button relabels once there is a result to scan *again*.
+    await expect(scan).toHaveText('Scan again', { timeout: 8000 });
 
-    const findings = await page.evaluate(() =>
-      [
-        ...(document.querySelector('open-inspector-panel')?.shadowRoot?.querySelectorAll(
-          '.finding',
-        ) ?? []),
-      ].map((row) => row.textContent ?? ''),
-    );
-
+    const findings = await panel(page).locator('.finding').allTextContents();
     for (const finding of findings) expect(finding).not.toContain('open-inspector');
   });
 });
@@ -704,19 +548,12 @@ test.describe('the support link', () => {
     await open(page, serviceWorker);
     await pin(page, '.card');
 
-    const link = await page.evaluate(() => {
-      const anchor = document
-        .querySelector('open-inspector-panel')
-        ?.shadowRoot?.querySelector('.foot-link');
-      if (!(anchor instanceof HTMLAnchorElement)) return null;
-      return { href: anchor.href, target: anchor.target, rel: anchor.rel, text: anchor.textContent };
-    });
-
-    expect(link?.text).toBe('Buy me a coffee');
+    const link = panel(page).locator('.foot-link');
+    await expect(link).toHaveText('Buy me a coffee');
     // A new tab, and one that cannot reach back into the page it came from.
-    expect(link?.target).toBe('_blank');
-    expect(link?.rel).toContain('noopener');
-    expect(link?.rel).toContain('noreferrer');
+    await expect(link).toHaveAttribute('target', '_blank');
+    await expect(link).toHaveAttribute('rel', /noopener/);
+    await expect(link).toHaveAttribute('rel', /noreferrer/);
 
     // The link is inert until pressed. Rendering the panel must not touch the
     // network — which is why this is a text link and not the hosted badge.
@@ -730,6 +567,6 @@ test.describe('the support link', () => {
     const page = await context.newPage();
     await open(page, serviceWorker);
 
-    expect(await panelText(page, '.foot-link')).toBe('Buy me a coffee');
+    await expect(panel(page).locator('.foot-link')).toHaveText('Buy me a coffee');
   });
 });
