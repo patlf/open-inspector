@@ -304,6 +304,28 @@ code {
 
 h2.plain { margin-bottom: var(--s2); }
 
+/* Launch-day pointer to Product Hunt. A link, not their embedded badge — see index.html. */
+.ph {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: var(--s3);
+  padding: 6px 14px 6px 6px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--raised);
+  color: var(--ink-soft);
+  font-size: var(--t-1);
+  text-decoration: none;
+}
+.ph b { color: var(--ink); font-weight: 600; }
+.ph:hover { border-color: var(--accent); }
+.ph:hover .ph-arrow { transform: translateX(2px); }
+.ph-mark { display: block; flex: none; }
+.ph-arrow { color: var(--accent); transition: transform 120ms ease-out; }
+@media (prefers-reduced-motion: reduce) { .ph-arrow { transition: none; } }
+@media (max-width: 480px) { .ph-more { display: none; } }
+
 h1 {
   margin: 0 0 var(--s3);
   font-family: var(--mono);
