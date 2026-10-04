@@ -34,7 +34,7 @@ export function emitCssVariables(set: TokenSet): string {
   const lines = [...header(set, (text) => `/* ${text} */`), ':root {'];
 
   for (const { name, token } of nameColors(set.colors)) {
-    lines.push(`  --color-${name}: ${token.hex};`);
+    lines.push(`  --color-${name}: ${token.value ?? token.hex};`);
   }
   for (const { name, token } of nameFonts(set.fonts)) {
     lines.push(`  --font-${name}: ${familyValue(token.family)};`);
@@ -60,7 +60,7 @@ export function emitScssVariables(set: TokenSet): string {
   const lines = header(set, (text) => `// ${text}`);
 
   for (const { name, token } of nameColors(set.colors)) {
-    lines.push(`$color-${name}: ${token.hex};`);
+    lines.push(`$color-${name}: ${token.value ?? token.hex};`);
   }
   for (const { name, token } of nameFonts(set.fonts)) {
     lines.push(`$font-${name}: ${familyValue(token.family)};`);
@@ -77,7 +77,9 @@ export function emitScssVariables(set: TokenSet): string {
 
 export function emitJson(set: TokenSet): string {
   const output = {
-    color: Object.fromEntries(nameColors(set.colors).map(({ name, token }) => [name, token.hex])),
+    color: Object.fromEntries(
+      nameColors(set.colors).map(({ name, token }) => [name, token.value ?? token.hex]),
+    ),
     font: Object.fromEntries(nameFonts(set.fonts).map(({ name, token }) => [name, token.family])),
     fontSize: Object.fromEntries(nameScale(set.fontSizes).map(({ name, token }) => [name, rem(token)])),
     space: Object.fromEntries(nameScale(set.spacing).map(({ name, token }) => [name, px(token.px)])),
@@ -102,6 +104,8 @@ export function emitW3cTokens(set: TokenSet): string {
   });
 
   const output = {
+    // Hex whatever the chosen notation: a colour token's string form is a hex
+    // colour in the design-tokens format, and that is what its importers read.
     color: wrap(
       'color',
       nameColors(set.colors).map(({ name, token }) => [name, token.hex] as [string, string]),
@@ -183,7 +187,9 @@ export function emitTailwindConfig(set: TokenSet): string {
 
   section(
     'colors',
-    nameColors(set.colors).map(({ name, token }) => [name, token.hex] as [string, string]),
+    nameColors(set.colors).map(
+      ({ name, token }) => [name, token.value ?? token.hex] as [string, string],
+    ),
   );
   section(
     'fontFamily',
@@ -233,7 +239,7 @@ export function emitLlmHandoff(set: TokenSet): string {
   for (const { name, token } of nameColors(set.colors)) {
     const role = token.role ? ` — ${token.role}` : '';
     const usage = token.usage ? ` (${token.usage}×)` : '';
-    lines.push(`- \`${name}\` ${token.hex}${role}${usage}`);
+    lines.push(`- \`${name}\` ${token.value ?? token.hex}${role}${usage}`);
   }
 
   lines.push('', '## Type', ...bullet('families', set.fonts.map((font) => font.family)));

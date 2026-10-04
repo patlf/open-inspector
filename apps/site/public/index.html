@@ -6,7 +6,7 @@
     <title>Open Inspector — inspect any page, with no site access</title>
     <meta
       name="description"
-      content="A free, open-source browser extension that inspects layout, styles, colour, type and assets on any page — and requests no access to your data. No host permissions, no network requests, no account."
+      content="A free, open-source browser extension that inspects layout, styles, color, type and assets on any page — and requests no access to your data. No host permissions, no network requests, no account."
     />
     <link rel="icon" href="favicon.svg?v=2" type="image/svg+xml" />
     <link rel="alternate icon" href="favicon-32.png?v=2" sizes="32x32" type="image/png" />
@@ -107,9 +107,10 @@
             <span class="ask-who">Open Inspector</span>
             <span class="ask-what">No site access requested</span>
             <p class="ask-why">
-              The manifest declares <code>activeTab</code> and <code>scripting</code>, and no host
-              permissions at all. <code>activeTab</code> is granted by your click, for one tab, and
-              revoked by the browser the moment you navigate away.
+              The manifest declares <code>activeTab</code>, <code>scripting</code> and
+              <code>storage</code>, and no host permissions at all. <code>activeTab</code> is
+              granted by your click, for one tab, and revoked by the browser the moment you navigate
+              away. <code>storage</code> keeps your settings on this device, nothing more.
             </p>
           </div>
 
@@ -203,9 +204,9 @@
           <article class="walk-block" id="w-color">
             <div class="walk-copy">
               <h3>Color</h3>
-              <p class="walk-lead"><b>Whether anyone can actually read it,</b> not just what the colour is. Live WCAG grading, and an audit of every failing sample on the page.</p>
+              <p class="walk-lead"><b>Whether anyone can actually read it,</b> not just what the color is. Live WCAG grading, and an audit of every failing sample on the page.</p>
               <ul class="walk-list">
-                <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2s4 4.5 4 7a4 4 0 0 1-8 0c0-2.5 4-7 4-7z"/></svg><span>AA/AAA grading with the nearest passing colour</span></li>
+                <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2s4 4.5 4 7a4 4 0 0 1-8 0c0-2.5 4-7 4-7z"/></svg><span>AA/AAA grading with the nearest passing color</span></li>
                 <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 8s2.5-4 7-4 7 4 7 4-2.5 4-7 4-7-4-7-4z"/><circle cx="8" cy="8" r="1.8"/></svg><span>Screen eyedropper, reading images and canvas</span></li>
                 <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 2h5v5H2zM9 2h5v5H9zM2 9h5v5H2zM9 9h5v5H9z"/></svg><span>Palette clustered in OKLab</span></li>
               </ul>

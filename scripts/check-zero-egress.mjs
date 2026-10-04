@@ -9,7 +9,8 @@
  *
  * Three independent checks:
  *   1. Our own source contains no network API usage.
- *   2. The generated manifest requests nothing beyond activeTab + scripting.
+ *   2. The generated manifest requests nothing beyond activeTab, scripting
+ *      and storage.
  *   3. The shipped bundles contain no network API usage either — which also
  *      covers anything a dependency might have dragged in.
  *
@@ -46,6 +47,9 @@ const NETWORK_PATTERNS = [
   { name: 'RTCPeerConnection', pattern: /\bRTCPeerConnection\b/ },
   { name: 'new Image()', pattern: /\bnew\s+Image\s*\(/ },
   { name: 'window.open()', pattern: /\bwindow\.open\s*\(/ },
+  // Settings live in storage.local. storage.sync uploads them to the browser
+  // vendor's servers: a network write by another name.
+  { name: 'storage.sync', pattern: /\bstorage\.sync\b/ },
 ];
 
 /**
@@ -53,15 +57,27 @@ const NETWORK_PATTERNS = [
  *
  * The `optional_*` keys matter as much as the required ones: they let a later
  * version ask at run time for exactly what the install screen said it would
- * never need.
+ * never need. `optional_permissions` is checked on its own, below, for the
+ * one exception.
  */
 const FORBIDDEN_MANIFEST_KEYS = [
   'host_permissions',
-  'optional_permissions',
   'optional_host_permissions',
   'externally_connectable',
   'web_accessible_resources',
 ];
+
+/**
+ * The only optional permission there is, and only in the Firefox manifest:
+ * `devtools`, for the DevTools tab.
+ *
+ * Firefox warns at install ("Extend developer tools to access your data in
+ * open tabs") for a required `devtools`, and asks nothing for an optional
+ * one until the user turns the tab on in settings. Optional is the stricter
+ * of the two, which is why it is allowed and why nothing else is: it grants
+ * no host access and reads nothing until DevTools is open on a tab.
+ */
+const ALLOWED_OPTIONAL_PERMISSIONS = ['devtools'];
 
 /**
  * The complete list of permissions this extension may request.
@@ -69,8 +85,11 @@ const FORBIDDEN_MANIFEST_KEYS = [
  * An allowlist, not a denylist: a denylist is only as good as the day it was
  * written, and Chrome keeps adding permissions. Anything new has to be added
  * here, in review, on purpose.
+ *
+ * `storage` is here for the settings view, and only for `storage.local`; the
+ * network patterns above refuse the sync storage area.
  */
-const ALLOWED_PERMISSIONS = new Set(['activeTab', 'scripting']);
+const ALLOWED_PERMISSIONS = new Set(['activeTab', 'scripting', 'storage']);
 
 const violations = [];
 
@@ -143,6 +162,23 @@ async function checkManifests() {
     for (const key of FORBIDDEN_MANIFEST_KEYS) {
       if (key in manifest) {
         record(relativePath, `manifest declares "${key}": ${JSON.stringify(manifest[key])}`);
+      }
+    }
+
+    if ('optional_permissions' in manifest) {
+      // The Firefox build, by where it was written and by its event-page
+      // background. Not by browser_specific_settings: the Chrome manifest
+      // carries that key too.
+      const isFirefox =
+        /(^|[\\/])firefox-/.test(relativePath) && Array.isArray(manifest.background?.scripts);
+      const exact =
+        JSON.stringify(manifest.optional_permissions) === JSON.stringify(ALLOWED_OPTIONAL_PERMISSIONS);
+      if (!isFirefox || !exact) {
+        record(
+          relativePath,
+          `manifest declares "optional_permissions": ${JSON.stringify(manifest.optional_permissions)} — ` +
+            `only ${JSON.stringify(ALLOWED_OPTIONAL_PERMISSIONS)}, and only for Firefox, is allowed`,
+        );
       }
     }
 

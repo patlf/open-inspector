@@ -1,8 +1,10 @@
 import {
   a11y,
+  assets,
   cascade,
   color,
   describeElement,
+  fileName,
   formatDimensions,
   layout,
   readBoxModel,
@@ -18,6 +20,7 @@ import type {
   LayoutInfo,
   PanelData,
   RuleInfo,
+  SourceInfo,
   TreeInfo,
   TypeInfo,
 } from './view-model.js';
@@ -86,6 +89,7 @@ function toEntry(role: string, rgba: color.Rgba | null): ColorEntry | null {
   const formats = color.formatColor(rgba);
   const entry: ColorEntry = {
     hex: formats.hex,
+    hexa: formats.hexa,
     rgb: formats.rgb,
     hsl: formats.hsl,
     oklch: formats.oklch,
@@ -144,10 +148,10 @@ export const BACKDROP_REASONS: Record<color.BackdropUncertainty, a11y.Indetermin
 
 /** Plain-language explanation of an unreadable backdrop, for the panel. */
 const BACKDROP_EXPLANATIONS: Record<color.BackdropUncertainty, string> = {
-  gradient: 'The text sits on a gradient, so there is no single background colour to grade against.',
+  gradient: 'The text sits on a gradient, so there is no single background color to grade against.',
   image: 'The text sits on an image, so the contrast depends on which pixels are behind it.',
-  blend: 'A blend mode is in play, so the painted background is not any declared colour.',
-  unreadable: 'A background colour on an ancestor could not be parsed, so any ratio would be a guess.',
+  blend: 'A blend mode is in play, so the painted background is not any declared color.',
+  unreadable: 'A background color on an ancestor could not be parsed, so any ratio would be a guess.',
   'depth-limit':
     'Every ancestor up to the root is translucent, so nothing establishes an opaque background.',
 };
@@ -189,7 +193,7 @@ function readContrast(element: Element, view: Window): ContrastInfo | null {
       reason:
         backdrop.kind === 'indeterminate'
           ? BACKDROP_EXPLANATIONS[backdrop.reason]
-          : 'The background could not be resolved to one opaque colour, so any ratio would be a guess.',
+          : 'The background could not be resolved to one opaque color, so any ratio would be a guess.',
     };
   }
 
@@ -387,14 +391,7 @@ function isAuthored(value: string): boolean {
 /** Shorten a stylesheet URL to something that fits in the panel. */
 function sourceLabel(sheet: { href?: string | null } | null | undefined): string {
   const href = sheet?.href;
-  if (!href) return 'inline';
-  try {
-    const url = new URL(href);
-    const file = url.pathname.split('/').filter(Boolean).pop();
-    return file ?? url.hostname;
-  } catch {
-    return href;
-  }
+  return href ? fileName(href) : 'inline';
 }
 
 /**
@@ -474,6 +471,35 @@ function readRules(
   return { rules, unreadableSheets: explained.unreadableSheetCount };
 }
 
+// ── source ──────────────────────────────────────────────────────────────────
+
+const LANGUAGE_LABELS: Record<markup.ElementSource['language'], string> = {
+  css: 'CSS',
+  javascript: 'JavaScript',
+  json: 'JSON',
+  html: 'HTML',
+};
+
+function readSource(element: Element): SourceInfo | undefined {
+  const read = markup.readElementSource(element);
+  if (!read) return undefined;
+
+  const info: SourceInfo = {
+    language: LANGUAGE_LABELS[read.language],
+    text: read.text,
+    truncated: read.truncated,
+  };
+  if (read.note) info.note = read.note;
+  return info;
+}
+
+/** The nearest `<svg>` an element is, or is drawn in. */
+function svgRootOf(element: Element): SVGSVGElement | null {
+  if (element.namespaceURI !== 'http://www.w3.org/2000/svg') return null;
+  if (element.localName === 'svg') return element as SVGSVGElement;
+  return (element as SVGElement).ownerSVGElement;
+}
+
 // ── entry point ─────────────────────────────────────────────────────────────
 
 /** Build the breadcrumb and stepping flags for one element. */
@@ -508,6 +534,11 @@ export interface CollectOptions {
   styleIndex?: cascade.StyleIndex | null;
   /** Elements belonging to the inspector, hidden from the tree. */
   ignore?: (element: Element) => boolean;
+  /**
+   * Rewrite the colours inside displayed values into this notation. Without
+   * it, values stay exactly as the browser serialized them.
+   */
+  colorFormat?: color.ColorFormat | undefined;
 }
 
 /** Read everything the panel shows for a single element. */
@@ -530,7 +561,7 @@ export function collectElementData(
     return found.rules.length > 0 ? [{ pseudo, rules: found.rules }] : [];
   });
 
-  return {
+  const data: PanelData = {
     selectorLabel: descriptor.selectorLabel,
     tagName: descriptor.tagName,
     dimensions: formatDimensions(descriptor.width, descriptor.height),
@@ -551,4 +582,46 @@ export function collectElementData(
       jsx: markup.serializeElement(element, { dialect: 'jsx' }).text,
     },
   };
+
+  const source = readSource(element);
+  if (source) data.source = source;
+  // The whole drawing, from the <svg> itself or anything inside it: a <path>
+  // on its own is not a file, but the icon it belongs to is.
+  const drawing = svgRootOf(element);
+  if (drawing) data.svgSource = assets.serializeInlineSvg(drawing);
+  if (options.colorFormat) applyColorFormat(data, options.colorFormat);
+  return data;
+}
+
+/**
+ * Write every colour the panel shows as text in one notation.
+ *
+ * Applied to display strings only, after the engine has done its work: the
+ * engine keeps reading the browser's own serialization, and swatches keep
+ * whatever they were given, since any notation paints the same.
+ */
+function applyColorFormat(data: PanelData, format: color.ColorFormat): void {
+  const rewrite = (value: string): string => color.reformatColors(value, format);
+  const rewriteField = (row: Field): Field => {
+    const next: Field = { ...row, value: rewrite(row.value) };
+    if (row.copy !== undefined) next.copy = rewrite(row.copy);
+    return next;
+  };
+  /** A whole colour, from any notation, into the chosen one. */
+  const convert = (value: string | undefined): string | undefined => {
+    const parsed = value ? color.parseColor(value) : null;
+    return parsed ? color.formatAs(parsed, format) : value;
+  };
+
+  data.spacing = data.spacing.map(rewriteField);
+  data.appearance = data.appearance.map(rewriteField);
+  data.layout.fields = data.layout.fields.map(rewriteField);
+  if (data.layout.parent) data.layout.parent.fields = data.layout.parent.fields.map(rewriteField);
+  if (data.typography.decoration) data.typography.decoration = rewrite(data.typography.decoration);
+
+  if (data.contrast?.kind === 'measured') {
+    data.contrast.foreground = convert(data.contrast.foreground);
+    data.contrast.background = convert(data.contrast.background);
+    data.contrast.suggestion = convert(data.contrast.suggestion);
+  }
 }

@@ -22,6 +22,7 @@ export {
   type Viewport,
 } from './chip-placement.js';
 export { OVERLAY_STYLES } from './overlay-styles.js';
+export { DEFAULT_SETTINGS, normalizeSettings, type InspectorSettings } from './settings.js';
 
 export { createPanel, type PanelHandle, type PanelOptions } from './panel/mount.jsx';
 export { collectElementData, type CollectOptions } from './panel/collect.js';
@@ -35,3 +36,4 @@ export {
   type DownloadTarget,
   type Saver,
 } from './panel/download.js';
+export * from './remote/index.js';

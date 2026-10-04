@@ -1,10 +1,11 @@
 # Privacy Policy — Open Inspector
 
-_Last updated: 21 August 2026_
+_Last updated: 3 October 2026_
 
 ## The short version
 
-Open Inspector collects nothing, stores nothing, and transmits nothing.
+Open Inspector collects nothing and transmits nothing. The one thing it stores
+is your own settings, on your own device.
 
 There is no analytics, no telemetry, no crash reporting, no account, no licence
 check and no server. The extension has no code capable of making a network
@@ -20,11 +21,18 @@ to send it.
 
 ## What data is stored
 
-**None.**
+**Your settings, and nothing else.**
 
-The extension does not use `chrome.storage`, `localStorage`, `IndexedDB`,
-cookies, or any other persistence. Everything it reads about a page lives in
-memory for as long as the panel is open and is discarded when you close it.
+The choices you make in the panel's settings view — today, the theme and
+which notation colors are written in — and where you last left the panel (docked or floating,
+and how wide) are kept with `storage.local`, on this device. Never
+`storage.sync`, which would upload them to the browser vendor; the build fails
+if that ever appears. Nothing about any page is stored: not a URL, not a value,
+not an edit.
+
+The extension uses no other persistence: no `localStorage`, `IndexedDB` or
+cookies. Everything it reads about a page lives in memory for as long as the
+panel is open and is discarded when you close it.
 
 Any change you make to a page — an edited CSS value, a forced `:hover` state, a
 hidden element — is reverted when the inspector closes, and is gone entirely on
@@ -35,7 +43,9 @@ reload.
 | Permission | Purpose |
 | --- | --- |
 | `activeTab` | Read the page you are inspecting. Granted by *your click* on the toolbar button or your press of the keyboard shortcut, for that one tab, and revoked by the browser when you navigate. |
-| `scripting` | Inject the inspector into that tab. Without it, `activeTab` cannot be used. |
+| `scripting` | Inject the inspector into that tab. Without it, `activeTab` cannot be used. The same permission runs two small scripts in the page's own world: one that starts a download when you press save, and a read-only one that lists the event handlers the page's scripts attached, for the JS panel. Neither sends anything anywhere. |
+| `storage` | Keep your settings on this device. It reads nothing from any page, and neither browser shows a warning for it at install. |
+| `devtools` (Firefox, optional) | Show the panel as a tab in Firefox DevTools. Not requested at install: it is asked for only if you turn the DevTools tab on in settings, and you can turn it off there again. It grants no access to any page; the inspector still reads a page only while you have it running there. |
 
 The extension declares **no host permissions**. Chrome's install screen will
 show no site access requested. It cannot read a page until you explicitly

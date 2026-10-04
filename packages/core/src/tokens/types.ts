@@ -12,6 +12,11 @@ export interface ColorToken {
   name?: string | undefined;
   hex: string;
   rgb?: string | undefined;
+  /**
+   * The colour in the notation the user chose, written out by every format
+   * that accepts any CSS colour. Falls back to `hex` when absent.
+   */
+  value?: string | undefined;
   /** How many elements use it. Drives ordering and naming. */
   usage?: number | undefined;
   /** text | background | border | accent */

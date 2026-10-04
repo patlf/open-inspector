@@ -5,6 +5,24 @@ import { SearchContext } from './search.jsx';
 import { useEditing } from './editing.jsx';
 import { Group } from './primitives.jsx';
 import { Icon, TAB_ICONS } from './icons.jsx';
+import { StructureTree, type StructureApi } from './structure-tree.jsx';
+import { SettingsSection } from './settings-view.jsx';
+import { SvgPasteSection } from './svg-tool.jsx';
+import { ScriptSection } from './script-section.jsx';
+import type { InspectorSettings, PanelPlacement, ThemeSetting } from '../settings.js';
+import {
+  DEFAULT_WIDTH,
+  MARGIN,
+  MAX_WIDTH,
+  MIN_FLOATING_HEIGHT,
+  MIN_WIDTH,
+  clampFloating,
+  clampHeight,
+  clampWidth,
+  dropPlacement,
+  nearestSide,
+  type Viewport,
+} from './placement.js';
 import {
   AssetsSection,
   MarkupSection,
@@ -13,6 +31,7 @@ import {
   LayoutSection,
   PseudoRulesSection,
   RulesSection,
+  SourceSection,
   StylesSection,
   TypeSection,
 } from './sections.jsx';
@@ -23,18 +42,40 @@ export interface PanelProps {
   onSelectAncestor: (depth: number) => void;
   /** Step to the parent, first child, or a sibling. */
   onStep: (direction: 'parent' | 'child' | 'previous' | 'next') => void;
+  /** The structure drawer's controls; absent, the drawer is not offered. */
+  structure?: StructureApi | undefined;
+  /** A setting was changed in the panel; absent, there is no settings view. */
+  onChangeSettings?: ((next: Partial<InspectorSettings>) => void) | undefined;
+  /** Whether a change is kept beyond this session. */
+  settingsSaved?: boolean | undefined;
   /** True when the panel is frozen on one element. */
   pinned: boolean;
   /** True while the picker is armed and the page is being captured. */
   picking: boolean;
   onTogglePicking: () => void;
   onClose: () => void;
-  /** Which edge the panel is docked to. */
-  side: 'left' | 'right';
-  onFlip: () => void;
+  /** Docked to a side, or floating where it was dropped. */
+  placement: PanelPlacement;
+  /** Light, dark, or the system's; absent, the system's. */
+  theme?: ThemeSetting | undefined;
+  /** The window the panel is in, for its size. */
+  view: Window;
+  /**
+   * The panel was moved, docked or resized. `commit` is false while a drag is
+   * under way and true once it settles — the moment worth saving.
+   */
+  onPlace: (next: PanelPlacement, commit: boolean) => void;
   /** Closing would revert this many edits and is waiting to be confirmed; null when not asking. */
   confirmClose?: number | null;
   onCancelClose?: () => void;
+  /** Opens the page that turns on the Firefox DevTools tab; absent elsewhere. */
+  onSetUpDevtools?: (() => void) | undefined;
+  /**
+   * Fill the host rather than float over a page: the panel as a DevTools
+   * tab, which owns its own space. Nothing to dock, drag, resize or
+   * collapse there, so those controls are left out.
+   */
+  embedded?: boolean;
 }
 
 /**
@@ -133,10 +174,15 @@ function Breadcrumb({
   tree,
   onSelectAncestor,
   onStep,
+  structureOpen,
+  onToggleStructure,
 }: {
   tree: TreeInfo;
   onSelectAncestor: (depth: number) => void;
   onStep: PanelProps['onStep'];
+  structureOpen: boolean;
+  /** Absent when there is no drawer to toggle. */
+  onToggleStructure?: (() => void) | undefined;
 }) {
   const trail = useRef<HTMLElement>(null);
 
@@ -192,6 +238,23 @@ function Breadcrumb({
         >
           <Icon name="right" size={12} />
         </button>
+        {/* With the steps, because it is another way of moving around the
+            same tree — the one that reaches anything in two clicks. */}
+        {onToggleStructure ? (
+          <button
+            type="button"
+            class="step"
+            aria-pressed={structureOpen}
+            // Only while there is a drawer to point at: an id that is not in
+            // the document is an invalid reference.
+            aria-controls={structureOpen ? 'oi-structure' : undefined}
+            aria-label="Structure"
+            title={structureOpen ? 'Hide the document tree' : 'Show the document tree'}
+            onClick={onToggleStructure}
+          >
+            <Icon name="tree" size={12} />
+          </button>
+        ) : null}
       </div>
 
       <nav class="crumb-trail" aria-label="Ancestors" ref={trail}>
@@ -480,90 +543,239 @@ function ConfirmClose({
   );
 }
 
-/** Narrowest width the rows still lay out in; widest before it stops being a side panel. */
-const MIN_WIDTH = 300;
-const MAX_WIDTH = 720;
-const DEFAULT_WIDTH = 348;
-
-/**
- * Remembered for as long as the page is open, and no longer.
- *
- * Persisting it would mean either the page's own localStorage — writing to
- * storage we do not own — or the `storage` permission, which the manifest
- * does not have and the egress guard would reject. A width that survives
- * closing and reopening the panel on the same page covers the actual need.
- */
-let rememberedWidth = DEFAULT_WIDTH;
-
-function clampWidth(width: number, view: Window | null): number {
-  const room = (view?.innerWidth ?? MAX_WIDTH + 48) - 48;
-  return Math.round(Math.max(MIN_WIDTH, Math.min(width, MAX_WIDTH, room)));
+function viewportOf(view: Window): Viewport {
+  return { width: view.innerWidth, height: view.innerHeight };
 }
 
+/** A size change from one of the handles. `height: null` runs the panel to the bottom margin. */
+type PanelSize = { width?: number; height?: number | null };
+
 /**
- * The inner edge, as a handle.
+ * An edge or corner of the panel, as a handle.
  *
  * A fixed 348px panel regularly sat on top of the very element being read,
- * and flipping sides only helps if the other side is empty. Dragging the edge
- * (or arrow keys while it has focus) trades panel width for page.
+ * and flipping sides only helps if the other side is empty. The side handle
+ * trades width for page — the inner edge when docked, the right one when
+ * floating. The bottom one does the same with height, and the corner does
+ * both at once. Side and bottom also answer arrow keys while focused; the
+ * corner adds nothing a keyboard needs, so it is left out of the tab order.
  */
 function ResizeHandle({
-  side,
+  kind,
+  edge,
   width,
+  height,
   onResize,
 }: {
-  side: 'left' | 'right';
+  kind: 'side' | 'bottom' | 'corner';
+  /** The edge the width is measured from: where a side or corner handle sits. */
+  edge: 'left' | 'right';
   width: number;
-  onResize: (width: number) => void;
+  /** The height the panel has now, however it got it. */
+  height: number;
+  onResize: (size: PanelSize, commit: boolean) => void;
 }) {
   const handle = useRef<HTMLDivElement>(null);
+  /** The panel's box when the drag began; sizes are measured from its far edges. */
+  const start = useRef<DOMRect | null>(null);
+  /**
+   * Where the press landed, and whether the pointer has left it since.
+   *
+   * A press that never moves is a click, and must not resize anything. The
+   * handle is a few pixels thick, so measuring a size from wherever the click
+   * landed nudged the panel — and moved the edge out from under the pointer,
+   * so the second click of a double-click landed outside it.
+   */
+  const press = useRef<{ x: number; y: number; moved: boolean } | null>(null);
 
-  function widthAt(clientX: number): number {
-    const view = handle.current?.ownerDocument.defaultView ?? null;
-    const edge = side === 'right' ? (view?.innerWidth ?? 0) - clientX - 12 : clientX - 12;
-    return clampWidth(edge, view);
+  function viewport(): Viewport {
+    const view = handle.current?.ownerDocument.defaultView;
+    return view ? viewportOf(view) : { width: MAX_WIDTH + 48, height: 0 };
+  }
+
+  function sizeAt(clientX: number, clientY: number): PanelSize {
+    const box = start.current;
+    if (!box) return {};
+    const size: PanelSize = {};
+    if (kind !== 'bottom') {
+      size.width = clampWidth(edge === 'left' ? box.right - clientX : clientX - box.left, viewport());
+    }
+    if (kind !== 'side') size.height = clampHeight(clientY - box.top, box.top, viewport());
+    return size;
+  }
+
+  const reset: PanelSize =
+    kind === 'side'
+      ? { width: DEFAULT_WIDTH }
+      : kind === 'bottom'
+        ? { height: null }
+        : { width: DEFAULT_WIDTH, height: null };
+
+  const label = kind === 'bottom' ? 'Panel height' : 'Panel width';
+  const pointer = {
+    onPointerDown: (event: PointerEvent) => {
+      event.preventDefault();
+      const target = event.currentTarget as HTMLElement;
+      start.current = target.parentElement?.getBoundingClientRect() ?? null;
+      press.current = { x: event.clientX, y: event.clientY, moved: false };
+      target.setPointerCapture(event.pointerId);
+      target.dataset['dragging'] = 'true';
+    },
+    onPointerMove: (event: PointerEvent) => {
+      const at = press.current;
+      if (!at || !(event.currentTarget as HTMLElement).hasPointerCapture(event.pointerId)) return;
+      if (!at.moved && Math.hypot(event.clientX - at.x, event.clientY - at.y) < 2) return;
+      at.moved = true;
+      onResize(sizeAt(event.clientX, event.clientY), false);
+    },
+    onPointerUp: (event: PointerEvent) => {
+      const target = event.currentTarget as HTMLElement;
+      target.releasePointerCapture(event.pointerId);
+      delete target.dataset['dragging'];
+      if (press.current?.moved) onResize(sizeAt(event.clientX, event.clientY), true);
+      start.current = null;
+      press.current = null;
+    },
+    onDblClick: () => onResize(reset, true),
+  };
+
+  if (kind === 'corner') {
+    return (
+      <div
+        ref={handle}
+        class="resize-corner"
+        aria-hidden="true"
+        title="Drag to resize · double-click to reset"
+        {...pointer}
+      >
+        {/* Three single-pixel dimples in the corner's 2×2 grid, the empty cell
+            away from the corner, so the grip points at where it pulls. Each
+            is a shade pixel with a light one below and right of it, which is
+            what reads as pressed in. */}
+        <svg class="corner-grip" viewBox="0 0 5 5" width="5" height="5">
+          <rect class="grip-light" x="4" y="1" width="1" height="1" />
+          <rect class="grip-light" x="4" y="4" width="1" height="1" />
+          <rect class="grip-light" x="1" y="4" width="1" height="1" />
+          <rect class="grip-shade" x="3" y="0" width="1" height="1" />
+          <rect class="grip-shade" x="3" y="3" width="1" height="1" />
+          <rect class="grip-shade" x="0" y="3" width="1" height="1" />
+        </svg>
+      </div>
+    );
   }
 
   return (
     <div
       ref={handle}
-      class="resize-handle"
+      class={kind === 'bottom' ? 'resize-bottom' : 'resize-handle'}
       role="separator"
-      aria-orientation="vertical"
-      aria-label="Panel width"
-      aria-valuenow={width}
-      aria-valuemin={MIN_WIDTH}
-      aria-valuemax={MAX_WIDTH}
+      aria-orientation={kind === 'bottom' ? 'horizontal' : 'vertical'}
+      aria-label={label}
+      aria-valuenow={kind === 'bottom' ? height : width}
+      aria-valuemin={kind === 'bottom' ? MIN_FLOATING_HEIGHT : MIN_WIDTH}
+      aria-valuemax={kind === 'bottom' ? undefined : MAX_WIDTH}
       tabIndex={0}
-      title="Drag to resize · double-click to reset"
-      onPointerDown={(event) => {
-        event.preventDefault();
-        const target = event.currentTarget;
-        target.setPointerCapture(event.pointerId);
-        target.dataset['dragging'] = 'true';
-      }}
-      onPointerMove={(event) => {
-        if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
-        onResize(widthAt(event.clientX));
-      }}
-      onPointerUp={(event) => {
-        event.currentTarget.releasePointerCapture(event.pointerId);
-        delete event.currentTarget.dataset['dragging'];
-      }}
-      onDblClick={() => onResize(DEFAULT_WIDTH)}
+      title={
+        kind === 'bottom'
+          ? 'Drag to resize · double-click to fill the height'
+          : 'Drag to resize · double-click to reset'
+      }
+      {...pointer}
       onKeyDown={(event) => {
+        const step = event.shiftKey ? 48 : 16;
+        if (kind === 'bottom') {
+          if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+          event.preventDefault();
+          event.stopPropagation();
+          const top = start.current?.top ?? handle.current?.parentElement?.getBoundingClientRect().top ?? 0;
+          const next = height + (event.key === 'ArrowDown' ? step : -step);
+          onResize({ height: clampHeight(next, top, viewport()) }, true);
+          return;
+        }
         if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
         event.preventDefault();
         event.stopPropagation();
-        // Growing means moving the inner edge away from the panel's own side.
-        const grows = (event.key === 'ArrowLeft') === (side === 'right');
-        const step = event.shiftKey ? 48 : 16;
-        const view = handle.current?.ownerDocument.defaultView ?? null;
-        onResize(clampWidth(width + (grows ? step : -step), view));
+        // Growing means moving the handle away from the rest of the panel.
+        const grows = (event.key === 'ArrowLeft') === (edge === 'left');
+        onResize({ width: clampWidth(width + (grows ? step : -step), viewport()) }, true);
       }}
     />
   );
 }
+
+/** Controls a press on which is theirs, not the start of a drag. */
+const NOT_A_DRAG = 'button, input, select, textarea, a, [role="separator"]';
+
+/**
+ * Dragging the panel by its rail.
+ *
+ * A few pixels of travel before it counts, so a click on the rail — to
+ * start a double-click, say — never nudges the panel. While it
+ * moves, every position is reported uncommitted; the drop is the one that is
+ * saved, and dropping against a side edge docks the panel there.
+ */
+function usePanelDrag(
+  placement: PanelPlacement,
+  view: Window,
+  onPlace: PanelProps['onPlace'],
+  panel: { current: HTMLDivElement | null },
+) {
+  const [dragging, setDragging] = useState(false);
+  const drag = useRef<{ x: number; y: number; left: number; top: number; moved: boolean } | null>(
+    null,
+  );
+
+  const offsets = (event: PointerEvent) => {
+    const start = drag.current;
+    return start ? { left: start.left + event.clientX - start.x, top: start.top + event.clientY - start.y } : null;
+  };
+
+  return {
+    dragging,
+    handlers: {
+      onPointerDown(event: PointerEvent) {
+        if (event.button !== 0 || (event.target as Element | null)?.closest?.(NOT_A_DRAG)) return;
+        const box = panel.current?.getBoundingClientRect();
+        if (!box) return;
+        drag.current = { x: event.clientX, y: event.clientY, left: box.left, top: box.top, moved: false };
+        (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+      },
+      onPointerMove(event: PointerEvent) {
+        const start = drag.current;
+        const at = offsets(event);
+        if (!start || !at) return;
+        if (!start.moved && Math.hypot(event.clientX - start.x, event.clientY - start.y) < 4) return;
+        if (!start.moved) {
+          start.moved = true;
+          setDragging(true);
+        }
+        const position = clampFloating(at.left, at.top, placement.width, viewportOf(view));
+        onPlace({ ...placement, dock: null, ...position }, false);
+      },
+      onPointerUp(event: PointerEvent) {
+        const start = drag.current;
+        const at = offsets(event);
+        drag.current = null;
+        const target = event.currentTarget as HTMLElement;
+        if (target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId);
+        if (!start?.moved || !at) return;
+        setDragging(false);
+        onPlace(dropPlacement(event.clientX, at.left, at.top, placement, viewportOf(view)), true);
+      },
+      onDblClick(event: MouseEvent) {
+        if ((event.target as Element | null)?.closest?.(NOT_A_DRAG)) return;
+        onPlace({ ...placement, dock: nearestSide(placement, viewportOf(view)) }, true);
+      },
+    },
+  };
+}
+
+type DragHandlers = ReturnType<typeof usePanelDrag>['handlers'];
+
+/** How long the pointer rests on a rail button before its label shows: the hover delay in panel-styles. */
+const LABEL_DELAY_MS = 150;
+/** How long after leaving a labelled button the next label still shows at once. */
+const LABEL_WARM_MS = 300;
 
 /**
  * The section rail, following the WAI-ARIA tabs pattern.
@@ -581,19 +793,61 @@ function Rail({
   tab,
   edits,
   onSelect,
+  drag,
   children,
 }: {
   tab: PanelTab;
   /** Pending edits, counted on the Styles tab where the Changes list lives. */
   edits: number;
   onSelect: (tab: PanelTab) => void;
+  /** Its empty space is what the panel is dragged by; absent where it cannot move. */
+  drag?: Partial<DragHandlers> | undefined;
   /** Controls pinned to the foot of the rail. */
   children?: ComponentChildren;
 }) {
   const strip = useRef<HTMLElement>(null);
+  const rail = useRef<HTMLElement>(null);
+  const label = useRef({ enteredAt: 0, coolDown: 0 });
+  useEffect(() => () => clearTimeout(label.current.coolDown), []);
+
+  /**
+   * The rail button a pointer event crossed into or out of, or null when it
+   * only moved within one (between the icon and its button, say).
+   */
+  function crossed(event: PointerEvent): HTMLElement | null {
+    const button = (event.target as Element).closest<HTMLElement>('.tab, .rail-foot .icon-btn');
+    return button && !button.contains(event.relatedTarget as Node | null) ? button : null;
+  }
+
+  function enter(event: PointerEvent): void {
+    if (!crossed(event)) return;
+    clearTimeout(label.current.coolDown);
+    label.current.enteredAt = event.timeStamp;
+  }
+
+  /**
+   * Leaving a button whose label was up warms the rail, so the next label
+   * skips its delay and its fade. The data attribute is set directly: it is
+   * presentation only, and not worth a render on every pointer move.
+   */
+  function leave(event: PointerEvent): void {
+    const node = rail.current;
+    if (!node || !crossed(event)) return;
+    const shown =
+      node.dataset['warm'] === 'true' || event.timeStamp - label.current.enteredAt >= LABEL_DELAY_MS;
+    if (!shown) return;
+    node.dataset['warm'] = 'true';
+    label.current.coolDown = window.setTimeout(() => delete node.dataset['warm'], LABEL_WARM_MS);
+  }
+
+  /**
+   * The rail's one tab stop. With the settings view open no rail tab is
+   * selected, and a strip with no stop cannot be reached from the keyboard.
+   */
+  const stop = PANEL_TABS.some((entry) => entry.id === tab) ? tab : PANEL_TABS[0]!.id;
 
   function move(event: KeyboardEvent): void {
-    const index = PANEL_TABS.findIndex((entry) => entry.id === tab);
+    const index = PANEL_TABS.findIndex((entry) => entry.id === stop);
     const last = PANEL_TABS.length - 1;
     const forward = event.key === 'ArrowDown' || event.key === 'ArrowRight';
     const back = event.key === 'ArrowUp' || event.key === 'ArrowLeft';
@@ -614,7 +868,7 @@ function Rail({
   }
 
   return (
-    <aside class="rail">
+    <aside class="rail" ref={rail} onPointerOver={enter} onPointerOut={leave} {...drag}>
       <nav
         class="tabs"
         role="tablist"
@@ -632,7 +886,7 @@ function Rail({
             class="tab"
             aria-selected={entry.id === tab}
             aria-controls="oi-tabpanel"
-            tabIndex={entry.id === tab ? 0 : -1}
+            tabIndex={entry.id === stop ? 0 : -1}
             onClick={() => onSelect(entry.id)}
           >
             <Icon name={TAB_ICONS[entry.id]} size={15} />
@@ -657,26 +911,78 @@ export function Panel({
   picking,
   onTogglePicking,
   onClose,
-  side,
-  onFlip,
+  placement,
+  theme = 'system',
+  view,
+  onPlace,
   onSelectAncestor,
   onStep,
+  structure,
+  onChangeSettings,
+  settingsSaved = false,
   confirmClose = null,
   onCancelClose,
+  onSetUpDevtools,
+  embedded = false,
 }: PanelProps) {
   const [tab, setTab] = useState<PanelTab>('styles');
+  /** Where the settings button returns to when pressed again. */
+  const lastContentTab = useRef<PanelTab>('styles');
+  /** Markup pasted into the SVG tab, kept while the panel is open. */
+  const [pastedSvg, setPastedSvg] = useState('');
   const [query, setQuery] = useState('');
   const [collapsed, setCollapsed] = useState(false);
   const [showKeys, setShowKeys] = useState(false);
-  const [width, setWidthState] = useState(rememberedWidth);
   const body = useRef<HTMLDivElement>(null);
+  const frame = useRef<HTMLDivElement>(null);
+  const drag = usePanelDrag(placement, view, onPlace, frame);
+  const dragging = embedded ? false : drag.dragging;
+  const dragHandlers = embedded ? {} : drag.handlers;
 
-  const setWidth = (next: number) => {
-    rememberedWidth = next;
-    setWidthState(next);
+  const viewport = viewportOf(view);
+  const side = nearestSide(placement, viewport);
+  const width = clampWidth(placement.width, viewport);
+  const floating = placement.dock === null;
+  const position = floating ? clampFloating(placement.x, placement.y, width, viewport) : null;
+  const top = position?.y ?? MARGIN;
+  /** A dragged height, or all the room down to the bottom margin. */
+  const height =
+    placement.height === null
+      ? viewport.height - top - MARGIN
+      : clampHeight(placement.height, top, viewport);
+  const style: Record<string, string> = { width: `${width}px` };
+  if (position) {
+    style['left'] = `${position.x}px`;
+    style['top'] = `${position.y}px`;
+  }
+  if (placement.height !== null) {
+    style['height'] = `${height}px`;
+    style['bottom'] = 'auto';
+  }
+
+  /** Frame attributes both the onboarding and the full panel share. */
+  const frameProps = {
+    ref: frame,
+    class: 'panel',
+    'data-side': embedded ? 'embedded' : (placement.dock ?? 'float'),
+    // Absent for the system's: the stylesheet follows prefers-color-scheme then.
+    'data-theme': theme === 'system' ? undefined : theme,
+    'data-dragging': dragging,
+    style: embedded ? {} : style,
   };
-
-  const style = { width: `${width}px` };
+  const edge = placement.dock === 'right' ? 'left' : 'right';
+  const resize = (size: PanelSize, commit: boolean) => onPlace({ ...placement, ...size }, commit);
+  const resizeHandle = embedded ? null : (
+    <>
+      <ResizeHandle kind="side" edge={edge} width={width} height={height} onResize={resize} />
+      <ResizeHandle kind="bottom" edge={edge} width={width} height={height} onResize={resize} />
+      {/* The bottom-right corner, where it is the inner one. Docked right,
+          that corner is pinned to the window and could not widen anything. */}
+      {placement.dock === 'right' ? null : (
+        <ResizeHandle kind="corner" edge={edge} width={width} height={height} onResize={resize} />
+      )}
+    </>
+  );
   const edits = data?.edits?.length ?? 0;
   const closeTitle = edits > 0 ? `Close — reverts ${plural(edits, 'change')} (Esc)` : 'Close (Esc)';
 
@@ -685,11 +991,10 @@ export function Panel({
       type="button"
       class="icon-btn"
       aria-pressed={showKeys}
-      aria-label="Keyboard shortcuts"
-      title="Keyboard shortcuts"
       onClick={() => setShowKeys(!showKeys)}
     >
       <Icon name="help" size={15} />
+      <span class="tab-label">Keyboard shortcuts</span>
     </button>
   );
 
@@ -700,8 +1005,8 @@ export function Panel({
 
   if (!data) {
     return (
-      <div class="panel" data-side={side} style={style}>
-        <ResizeHandle side={side} width={width} onResize={setWidth} />
+      <div {...frameProps}>
+        {resizeHandle}
         <div class="main">
           <header class="head">
             <div class="head-top">
@@ -742,6 +1047,7 @@ export function Panel({
         type="button"
         class="panel-tab"
         data-side={side}
+        data-theme={theme === 'system' ? undefined : theme}
         title="Show the inspector panel"
         onClick={() => setCollapsed(false)}
       >
@@ -752,27 +1058,50 @@ export function Panel({
   }
 
   return (
-    <div class="panel" data-side={side} style={style}>
-      <ResizeHandle side={side} width={width} onResize={setWidth} />
+    <div {...frameProps}>
+      {resizeHandle}
       <Rail
         tab={tab}
         edits={edits}
+        drag={dragHandlers}
         onSelect={(next) => {
           // Re-selecting Styles is how you get back to the Changes list.
           if (next === tab) body.current?.scrollTo?.({ top: 0 });
+          lastContentTab.current = next;
           setTab(next);
         }}
       >
         {keysButton}
-        <button
-          type="button"
-          class="icon-btn"
-          aria-label="Move the panel to the other side"
-          title="Move the panel to the other side"
-          onClick={onFlip}
-        >
-          <Icon name="flip" size={15} />
-        </button>
+        {embedded ? null : (
+          <button
+            type="button"
+            class="icon-btn"
+            onClick={() =>
+              onPlace(
+                { ...placement, dock: floating ? side : side === 'right' ? 'left' : 'right' },
+                true,
+              )
+            }
+          >
+            <Icon name="flip" size={15} />
+            <span class="tab-label">
+              {floating ? `Dock the panel to the ${side}` : 'Move the panel to the other side'}
+            </span>
+          </button>
+        )}
+        {onChangeSettings ? (
+          <button
+            type="button"
+            id="oi-tab-settings"
+            class="icon-btn"
+            aria-pressed={tab === 'settings'}
+            aria-controls="oi-tabpanel"
+            onClick={() => setTab(tab === 'settings' ? lastContentTab.current : 'settings')}
+          >
+            <Icon name="settings" size={15} />
+            <span class="tab-label">Settings</span>
+          </button>
+        ) : null}
       </Rail>
 
       <div class="main">
@@ -788,15 +1117,17 @@ export function Panel({
             </span>
             <div class="head-actions">
               <InspectButton picking={picking} onToggle={onTogglePicking} compact />
-              <button
-                type="button"
-                class="icon-btn"
-                aria-label="Collapse"
-                title="Collapse to the edge — the page underneath stays inspectable"
-                onClick={() => setCollapsed(true)}
-              >
-                <Icon name={side === 'right' ? 'collapse' : 'expand'} />
-              </button>
+              {embedded ? null : (
+                <button
+                  type="button"
+                  class="icon-btn"
+                  aria-label="Collapse"
+                  title="Collapse to the edge — the page underneath stays inspectable"
+                  onClick={() => setCollapsed(true)}
+                >
+                  <Icon name={side === 'right' ? 'collapse' : 'expand'} />
+                </button>
+              )}
               <button
                 type="button"
                 class="icon-btn"
@@ -813,7 +1144,27 @@ export function Panel({
           {showKeys ? <ShortcutList /> : null}
           {note ? <p class="boundary-note">{note}</p> : null}
           {data.tree ? (
-            <Breadcrumb tree={data.tree} onSelectAncestor={onSelectAncestor} onStep={onStep} />
+            <Breadcrumb
+              tree={data.tree}
+              onSelectAncestor={onSelectAncestor}
+              onStep={onStep}
+              structureOpen={data.structure !== undefined}
+              onToggleStructure={
+                structure ? () => structure.setOpen(data.structure === undefined) : undefined
+              }
+            />
+          ) : null}
+          {/* Under the path it expands on, and above every tab, so a row
+              clicked here shows its styles directly below. */}
+          {data.structure && structure ? (
+            <StructureTree
+              info={data.structure}
+              api={structure}
+              onOpenScript={() => {
+                lastContentTab.current = 'js';
+                setTab('js');
+              }}
+            />
           ) : null}
           <div class="toolbar">
             <label class="search-box">
@@ -840,7 +1191,8 @@ export function Panel({
             </label>
             <HideButton />
           </div>
-          <CoverageHint onCollapse={() => setCollapsed(true)} />
+          {/* Covering the page is a floating panel's problem, not a tab's. */}
+          {embedded ? null : <CoverageHint onCollapse={() => setCollapsed(true)} />}
         </header>
 
         <SearchContext.Provider value={query}>
@@ -853,11 +1205,15 @@ export function Panel({
           data-searching={query.trim() !== ''}
         >
           {tab === 'styles' ? (
-            <>
-              <StylesSection data={data} />
-              <RulesSection data={data} />
-              <PseudoRulesSection data={data} />
-            </>
+            data.source ? (
+              <SourceSection data={data} />
+            ) : (
+              <>
+                <StylesSection data={data} />
+                <RulesSection data={data} />
+                <PseudoRulesSection data={data} />
+              </>
+            )
           ) : null}
           {tab === 'color' ? <ColorSection data={data} /> : null}
           {tab === 'type' ? <TypeSection data={data} /> : null}
@@ -872,7 +1228,17 @@ export function Panel({
           ) : null}
           {tab === 'assets' ? <AssetsSection data={data} /> : null}
           {tab === 'markup' ? <MarkupSection data={data} /> : null}
+          {tab === 'js' ? <ScriptSection data={data} /> : null}
           {tab === 'export' ? <ExportSection data={data} /> : null}
+          {tab === 'svg' ? <SvgPasteSection text={pastedSvg} onText={setPastedSvg} /> : null}
+          {tab === 'settings' && onChangeSettings && data.settings ? (
+            <SettingsSection
+              settings={data.settings}
+              saved={settingsSaved}
+              onChange={onChangeSettings}
+              onSetUpDevtools={onSetUpDevtools}
+            />
+          ) : null}
         </div>
         </SearchContext.Provider>
         <Footer />

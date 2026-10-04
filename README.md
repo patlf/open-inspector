@@ -32,7 +32,7 @@ This one asks for nothing. Chrome's own install screen will tell you the same th
   <img src="docs/media/permissions-light.png" alt="Open Inspector requests no site access; the established alternatives request read and change all your data on all websites." width="900">
 </picture>
 
-The manifest declares `activeTab` and `scripting`, and no `host_permissions` key exists. `activeTab` is granted by *your* click, for one tab, and revoked by the browser the moment you navigate away.
+The manifest declares `activeTab`, `scripting` and `storage`, and no `host_permissions` key exists. `activeTab` is granted by *your* click, for one tab, and revoked by the browser the moment you navigate away. `storage` keeps your settings on this device and nothing about any page.
 
 ## What it shows you
 
@@ -64,7 +64,7 @@ Hover anything, or click to hold it. Arrow keys walk the tree — <kbd>↑</kbd>
 <tr>
 <td width="50%" valign="top">
 
-**Color** — live WCAG AA/AAA grading with the nearest passing colour, a screen eyedropper that reads pixels the DOM cannot, and an audit that finds every failing text sample on the page and jumps to it.
+**Color** — live WCAG AA/AAA grading with the nearest passing color, a screen eyedropper that reads pixels the DOM cannot, and an audit that finds every failing text sample on the page and jumps to it.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/media/panel-color-dark.png">
@@ -85,13 +85,17 @@ Hover anything, or click to hold it. Arrow keys walk the tree — <kbd>↑</kbd>
 </tr>
 </table>
 
-Plus three more panels:
+Plus five more panels:
 
 | | |
 | --- | --- |
 | **Assets** | Images with the `srcset` candidate the browser really chose, inline SVG lifted out as standalone markup, video, webfonts, Lottie hints |
 | **Markup** | The element as HTML or JSX, with hydration ids, framework attributes and script-set inline styles stripped — source to paste, not a DOM recording |
+| **JS** | The element's event handlers — inline, `on…` properties, React, Vue and jQuery — with their source, and the page's scripts. The structure tree marks every element that has one, and can list only those. Plain `addEventListener` listeners are only visible to DevTools, and the panel says so |
 | **Export** | CSS custom properties, SCSS, Tailwind config, JSON, W3C design tokens, and a markdown handoff written for a coding assistant |
+| **SVG** | Optimize, minify or beautify the selected `<svg>`, an inline SVG asset, or markup pasted in |
+
+On Firefox, the whole panel can also live in DevTools, as its own tab next to the Inspector, following the element you select there. It's off until you turn it on in settings, and Firefox asks for the `devtools` permission at that point rather than at install.
 
 ## Do not take our word for it
 
@@ -110,7 +114,7 @@ pnpm verify   # typecheck, lint, unit tests, and the zero-egress guard
 
 ## Editing, safely
 
-Spacing and appearance in **Styles**, the metrics in **Type**, and the element's own colours in **Color** are all editable — click, type, Enter. Arrow keys step numbers (<kbd>Shift</kbd> by ten, <kbd>Alt</kbd> by a tenth).
+Spacing and appearance in **Styles**, the metrics in **Type**, and the element's own colors in **Color** are all editable — click, type, Enter. Arrow keys step numbers (<kbd>Shift</kbd> by ten, <kbd>Alt</kbd> by a tenth).
 
 Three properties make that safe on a page you cannot afford to break:
 
@@ -128,7 +132,7 @@ Honest failure beats a confident wrong answer, so the panel reports what it cann
 - **Iframes are not inspectable yet.** Same-origin frames are reachable in principle but not implemented; cross-origin frames are unreachable from the parent frame, for every extension. Open the frame in its own tab to inspect it.
 - **Asset thumbnails only show what the page already loaded.** An `og:image`, an unused favicon size or a prefetch hint is listed as "not loaded by the page", because rendering it would be a request of ours.
 - **The responsive preview cannot go below the operating system's minimum window width**, roughly 570px on macOS. The panel reports the width actually achieved rather than the one requested.
-- **`color-mix()`, `light-dark()` and relative colour syntax** are refused rather than guessed at. `lab()`, `lch()`, `oklch()` and `oklab()` all parse.
+- **`color-mix()`, `light-dark()` and relative color syntax** are refused rather than guessed at. `lab()`, `lch()`, `oklch()` and `oklab()` all parse.
 - **No screenshots, console or network debugging.** Those are separate products.
 - **No bulk asset download**, deliberately: zipping every asset would mean fetching every asset. The Assets tab offers the URL list for `curl` instead.
 
@@ -150,7 +154,8 @@ pnpm launch         # a disposable browser with the extension already installed
 | Command | What it does |
 | --- | --- |
 | `pnpm launch` | Disposable browser with the extension installed |
-| `pnpm dev` / `pnpm dev:firefox` | WXT dev build with hot reload |
+| `pnpm dev` | WXT dev build with hot reload (Chrome) |
+| `pnpm dev:firefox` / `pnpm dev:zen` | Firefox or Zen with the extension loaded, rebuilt and reloaded on every save |
 | `pnpm build` / `pnpm build:firefox` | Production build into `.output/` |
 | `pnpm zip` | Package for the store |
 | `pnpm test` | Unit tests |
@@ -178,7 +183,7 @@ packages/core    the engine. pure TypeScript, no chrome.*, no network
 packages/ui      shadow-DOM overlay and the interaction loop
 apps/extension   WXT shell: manifest, background worker, injected script
 apps/playground  manual test surface, and the demo page used for screenshots
-apps/site        the website — static files on Cloudflare Workers
+apps/site        the website — static files on GitHub Pages
 ```
 
 The engine deliberately knows nothing about browser extensions. It takes a DOM and returns data, which is what lets it be unit-tested without a browser and reused later in a CLI or a Playwright plugin.
@@ -191,13 +196,13 @@ The engine deliberately knows nothing about browser extensions. It takes a DOM a
 pnpm build && pnpm sweep
 ```
 
-Bundles the engine standalone, injects it into a dozen real production sites, and drives every module over a spread of elements on each. It reports two kinds of finding, deliberately kept apart: **errors** (something threw — always a bug) and **suspicions** (it returned, but the answer looks wrong — no rendered font on visible text, an empty palette on a colourful page).
+Bundles the engine standalone, injects it into a dozen real production sites, and drives every module over a spread of elements on each. It reports two kinds of finding, deliberately kept apart: **errors** (something threw — always a bug) and **suspicions** (it returned, but the answer looks wrong — no rendered font on visible text, an empty palette on a colorful page).
 
-It has already earned its keep. The first run found that Chrome serializes computed colours as `lab()` whenever the author used a modern colour space — so on tailwindcss.com, 2,398 colour values were being rejected as unreadable and the palette came back nearly empty. That is the most popular CSS framework there is, and no unit test would have caught it.
+It has already earned its keep. The first run found that Chrome serializes computed colors as `lab()` whenever the author used a modern color space — so on tailwindcss.com, 2,398 color values were being rejected as unreadable and the palette came back nearly empty. That is the most popular CSS framework there is, and no unit test would have caught it.
 
 ## Contributing
 
-The reliability harness is the best place to start. A page the inspector gets wrong is a perfectly scoped issue: add it to `tests/fixtures/` as a snapshot, assert the correct reading, and fix it. No product-design judgment required, and every fixture makes the next change safer.
+The reliability harness is the best place to start. A page the inspector gets wrong is a perfectly scoped issue: reproduce the shape that breaks it, assert the correct reading, and fix it. An engine reading gets a unit test beside its module (`*.browser.test.ts` when it needs real layout or the real cascade); anything that needs the whole extension gets a fixture page in `apps/playground/` — `hostile.html` is the model — and a spec in `tests/e2e/`. No product-design judgment required, and every fixture makes the next change safer.
 
 ## Supporting it
 

@@ -27,6 +27,16 @@ export default defineConfig({
       jsx: 'automatic',
       jsxImportSource: 'preact',
     },
+    /*
+     * No modulepreload polyfill in the extension's own pages (the DevTools
+     * tab and its setup page). It requests each preloaded chunk through the
+     * Fetch API — local files, but a request all the same, and the
+     * zero-egress guard rightly refuses any. Every browser this targets
+     * preloads modules natively, so the polyfill would never run anyway.
+     */
+    build: {
+      modulePreload: { polyfill: false },
+    },
   }),
 
   /**
@@ -41,11 +51,23 @@ export default defineConfig({
    */
   manifestVersion: 3,
 
-  manifest: {
+  manifest: ({ browser }) => ({
     name: 'Open Inspector',
     description:
       'Inspect layout, styles and design tokens on any page. Free, open source, and never sends anything anywhere.',
-    permissions: ['activeTab', 'scripting'],
+    /*
+     * `storage` holds the settings page's choices, on this device only. It
+     * asks the user nothing at install in either browser, and reads no page.
+     */
+    permissions: ['activeTab', 'scripting', 'storage'],
+    /*
+     * Firefox only: the DevTools tab, asked for when the user turns it on in
+     * settings rather than at install. A required `devtools` would show
+     * "Extend developer tools to access your data in open tabs" to every
+     * Firefox user, including the ones who never open DevTools. The egress
+     * guard allows exactly this optional permission and no other.
+     */
+    ...(browser === 'firefox' ? { optional_permissions: ['devtools'] } : {}),
     action: {
       default_title: 'Inspect this page (Alt+Shift+I)',
     },
@@ -70,5 +92,5 @@ export default defineConfig({
         ...({ data_collection_permissions: { required: ['none'] } } as object),
       },
     },
-  },
+  }),
 });

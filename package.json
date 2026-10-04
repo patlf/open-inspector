@@ -9,7 +9,8 @@
   },
   "scripts": {
     "dev": "pnpm --filter @open-inspector/extension dev",
-    "dev:firefox": "pnpm --filter @open-inspector/extension dev:firefox",
+    "dev:firefox": "node scripts/dev-gecko.mjs",
+    "dev:zen": "node scripts/dev-gecko.mjs --browser zen",
     "build": "pnpm --filter @open-inspector/extension build",
     "build:firefox": "pnpm --filter @open-inspector/extension build:firefox",
     "zip": "pnpm --filter @open-inspector/extension zip",
@@ -48,6 +49,7 @@
     "playwright": "^1.62.1",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.18.1",
-    "vitest": "^2.1.8"
+    "vitest": "^2.1.8",
+    "web-ext": "^10.7.0"
   }
 }

@@ -56,7 +56,7 @@ export async function pin(page: Page, target: string | Locator): Promise<void> {
 /** Select a tab by id and wait for it to report itself selected. */
 export async function openTab(
   page: Page,
-  id: 'styles' | 'color' | 'type' | 'layout' | 'assets' | 'markup' | 'export',
+  id: 'styles' | 'color' | 'type' | 'layout' | 'assets' | 'markup' | 'js' | 'export' | 'svg',
 ): Promise<void> {
   const tab = panel(page).locator(`#oi-tab-${id}`);
   await tab.click();
@@ -107,4 +107,62 @@ export async function serializePage(page: Page): Promise<string> {
     }
     return clone.outerHTML;
   });
+}
+
+interface CdpNode {
+  nodeName: string;
+  nodeValue?: string;
+  attributes?: string[];
+  children?: CdpNode[];
+  shadowRoots?: CdpNode[];
+}
+
+/**
+ * What the overlay's chip says: the element it is drawn over, and the detail
+ * beside it — its size, or the part of the box singled out from the panel.
+ *
+ * The overlay's shadow root is closed, so the page cannot read it, and a
+ * clipped screenshot does not capture the top layer it lives in. The DevTools
+ * protocol can pierce closed roots, which is what this asks it to do.
+ */
+export async function overlayChip(
+  page: Page,
+): Promise<{ selector: string | null; detail: string | null } | null> {
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    const { root } = (await cdp.send('DOM.getDocument', { depth: -1, pierce: true })) as {
+      root: CdpNode;
+    };
+
+    const find = (node: CdpNode, match: (candidate: CdpNode) => boolean): CdpNode | null => {
+      if (match(node)) return node;
+      for (const child of [...(node.shadowRoots ?? []), ...(node.children ?? [])]) {
+        const found = find(child, match);
+        if (found) return found;
+      }
+      return null;
+    };
+
+    const host = find(root, (node) => node.nodeName === 'OPEN-INSPECTOR-OVERLAY');
+    const chip = host && find(host, (node) => attribute(node, 'class') === 'chip');
+    if (!chip || attribute(chip, 'data-visible') !== 'true') return null;
+
+    const text = (className: string) =>
+      find(chip, (node) => attribute(node, 'class') === className)?.children?.[0]?.nodeValue ??
+      null;
+    return { selector: text('selector'), detail: text('dimensions') };
+  } finally {
+    await cdp.detach();
+  }
+}
+
+/** The element the overlay is drawn over, by its chip label. */
+export async function overlayLabel(page: Page): Promise<string | null> {
+  return (await overlayChip(page))?.selector ?? null;
+}
+
+function attribute(node: CdpNode, name: string): string | null {
+  const attributes = node.attributes ?? [];
+  const index = attributes.indexOf(name);
+  return index >= 0 && index % 2 === 0 ? (attributes[index + 1] ?? null) : null;
 }

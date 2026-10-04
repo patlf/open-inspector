@@ -17,7 +17,8 @@
   },
   "dependencies": {
     "@open-inspector/core": "workspace:*",
-    "@open-inspector/ui": "workspace:*"
+    "@open-inspector/ui": "workspace:*",
+    "js-beautify": "^2.0.3"
   },
   "devDependencies": {
     "wxt": "^0.19.29"

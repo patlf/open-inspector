@@ -43,6 +43,21 @@ export {
   readTreePosition,
   stepTree,
   DEFAULT_TRAIL_DEPTH,
+  fileName,
+  flattenStructure,
+  matchingStructure,
+  matchesStructureQuery,
+  MAX_STRUCTURE_VISITS,
+  structureChildren,
+  structurePath,
+  DEFAULT_STRUCTURE_CHILD_LIMIT,
+  MAX_STRUCTURE_ROWS,
+  type StructureListing,
+  type StructureMoreRow,
+  type StructureNode,
+  type StructureNodeRow,
+  type StructureOptions,
+  type StructureRow,
   type TreeCrumb,
   type TreeDirection,
   type TreeOptions,
@@ -67,3 +82,5 @@ export * as a11y from './a11y/index.js';
 export * as tokens from './tokens/index.js';
 export * as edit from './edit/index.js';
 export * as markup from './markup/index.js';
+export * as svg from './svg/index.js';
+export * as script from './script/index.js';

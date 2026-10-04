@@ -6,14 +6,18 @@ import {
   probeAtPoint,
   readBoxModel,
   ancestorTrail,
+  script,
   stepTree,
   type TreeDirection,
 } from '@open-inspector/core';
-import { createOverlay, type Overlay } from './overlay.js';
-import { createPanel, type PanelHandle } from './panel/mount.jsx';
+import { createOverlay, type BoxFocus, type Overlay } from './overlay.js';
+import { createPanel, type PanelHandle, type PanelOptions } from './panel/mount.jsx';
 import { collectElementData } from './panel/collect.js';
 import { createPageScanner, type ContrastAudit, type PageScanner } from './panel/page.js';
 import { saveViaAnchor } from './panel/download.js';
+import { createStructureModel, type StructureModel } from './panel/structure.js';
+import { normalizeSettings, type InspectorSettings } from './settings.js';
+import type { StructureApi } from './panel/structure-tree.jsx';
 import type { EditEntry, PageData, PanelData } from './panel/view-model.js';
 
 /**
@@ -38,11 +42,27 @@ export interface InspectorSession {
   /** True while the pointer picks elements and page clicks are captured. */
   readonly picking: boolean;
   readonly pinned: boolean;
+  /** The element being held, or null while the pointer decides. */
+  readonly selected: Element | null;
+  /**
+   * Hold an element, as clicking it would. Ignored while inactive. Lets a
+   * new session pick up where an old one left off — the playground's hot
+   * reload swaps sessions this way.
+   */
+  select(element: Element): void;
+  /**
+   * Drop the panel so the next paint builds a new one through
+   * `SessionOptions.surface`: how the panel moves into a DevTools tab and
+   * back without the session, its selection or its edits starting over.
+   */
+  replaceSurface(): void;
   activate(): void;
   deactivate(): void;
   toggle(): boolean;
   /** Arm or disarm the picker without closing the panel. */
   setPicking(picking: boolean): void;
+  /** Apply changed preferences — saved on the settings page, say, while this is open. */
+  updateSettings(settings: Partial<InspectorSettings>): void;
   destroy(): void;
 }
 
@@ -76,6 +96,40 @@ export interface SessionOptions {
   ) => void | Promise<string | null>;
   /** Called after the session deactivates, including via Escape. */
   onDeactivate?: () => void;
+  /** Starting preferences. The extension reads them from storage; defaults apply elsewhere. */
+  settings?: Partial<InspectorSettings>;
+  /**
+   * Keeps settings changed in the panel. Supplied by the extension, which
+   * writes them to storage; absent, a change lasts as long as the session.
+   */
+  onSettingsChange?: (settings: InspectorSettings) => void;
+  /**
+   * Runs `script.probeHandlersInPage` in the page's own world with this event
+   * name, resolving whether it ran.
+   *
+   * What a page's scripts attach — an `onclick` property, React and Vue
+   * props, jQuery bindings — is only visible from the page's world, and a
+   * content script lives in its own. The extension's worker can run code
+   * there; absent this, the JS view reads inline handlers only, and says so.
+   */
+  readPageHandlers?: (eventName: string) => Promise<boolean>;
+  /**
+   * Formats JavaScript for reading: inline scripts and handler sources, as
+   * the JS tab shows them. The extension's worker carries the formatter so
+   * the injected bundle does not; absent, code is shown as written.
+   */
+  beautify?: (code: string) => Promise<string>;
+  /**
+   * Builds the panel. Defaults to the in-page one; the extension swaps in a
+   * remote one while a DevTools tab is showing it. Asked again whenever the
+   * panel is rebuilt, so the choice can change between paints.
+   */
+  surface?: (options: PanelOptions) => PanelHandle;
+  /**
+   * Opens the page that turns on the Firefox DevTools tab. Supplied by the
+   * Firefox build only; absent, settings does not offer it.
+   */
+  setUpDevtools?: () => void;
 }
 
 /** A short human label for an element in the change list. */
@@ -202,6 +256,125 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
    * the style index and must not happen per hover.
    */
   let pseudoStates: edit.PseudoStateController | null = null;
+
+  /**
+   * What the page's own world reported, by element: null until read, once
+   * per page, alongside the page scan. `pageHandlersRead` is whether that
+   * read reached the page at all.
+   */
+  let pageHandlers: WeakMap<Element, script.ScriptHandler[]> | null = null;
+  let pageHandlersRead = false;
+  let readingHandlers = false;
+
+  /** The structure drawer's state. Created the first time the drawer opens. */
+  let structure: StructureModel | null = null;
+  /**
+   * The element under the pointer in the structure drawer.
+   *
+   * It borrows the highlight and nothing else: the panel keeps showing the
+   * selection, because hovering a row is looking, not choosing.
+   */
+  let previewElement: Element | null = null;
+  /** The part of the box model the pointer is on in the panel's diagram. */
+  let boxFocus: BoxFocus | null = null;
+  let settings = normalizeSettings(options.settings);
+
+  /**
+   * Read, once per page, what the page's scripts have wired to its elements.
+   *
+   * The probe reports by dispatching an event on each element, so the
+   * listener goes up before it runs and comes down after; the reports have
+   * all arrived by the time the worker answers, because the probe dispatches
+   * them synchronously while it runs.
+   */
+  async function ensurePageHandlers(): Promise<void> {
+    const read = options.readPageHandlers;
+    if (!read || pageHandlers || readingHandlers) return;
+    readingHandlers = true;
+
+    const found = new WeakMap<Element, script.ScriptHandler[]>();
+    const eventName = `open-inspector-handlers-${Math.random().toString(36).slice(2, 12)}`;
+    const stop = script.listenForHandlers(win, eventName, found);
+    let ran = false;
+    try {
+      ran = await read(eventName);
+    } catch {
+      ran = false;
+    } finally {
+      stop();
+      readingHandlers = false;
+    }
+
+    if (destroyed) return;
+    pageHandlers = found;
+    pageHandlersRead = ran;
+    structure?.refreshScripts();
+    if (active) scheduleRender();
+  }
+
+  /** Formatted JavaScript, by the source it was made from: each is formatted once. */
+  const beautified = new Map<string, string>();
+  const beautifying = new Set<string>();
+  /** Counts formatted results landing, so the page data is rebuilt once per batch, not per repaint. */
+  let beautifiedCount = 0;
+  let prettyPage: { source: PageData; count: number; page: PageData } | null = null;
+
+  /**
+   * Code as the panel shows it: formatted once the formatter has answered,
+   * as written until then. Asking is fire and forget; the answer repaints.
+   */
+  function pretty(code: string): string {
+    const formatted = beautified.get(code);
+    if (formatted !== undefined) return formatted;
+    const beautify = options.beautify;
+    if (beautify && !beautifying.has(code)) {
+      beautifying.add(code);
+      beautify(code)
+        .then(
+          (result) => beautified.set(code, result),
+          () => beautified.set(code, code),
+        )
+        .finally(() => {
+          beautifying.delete(code);
+          beautifiedCount += 1;
+          if (active) scheduleRender();
+        });
+    }
+    return code;
+  }
+
+  /** Script kinds worth formatting: JavaScript, and the JSON a page keeps in a script tag. */
+  const FORMATTED_SCRIPTS = new Set(['classic', 'module', 'json', 'importmap']);
+
+  /**
+   * The page data with its inline scripts formatted. The same object until a
+   * formatted result lands, since the DevTools tab resends the page data
+   * whenever it is a new one.
+   */
+  function withPrettyScripts(page: PageData): PageData {
+    if (prettyPage?.source === page && prettyPage.count === beautifiedCount) return prettyPage.page;
+    let changed = false;
+    const scripts = page.scripts.map((entry) => {
+      if (!entry.text || !FORMATTED_SCRIPTS.has(entry.kind)) return entry;
+      const text = pretty(entry.text);
+      if (text === entry.text) return entry;
+      changed = true;
+      return { ...entry, text };
+    });
+    const next = changed ? { ...page, scripts } : page;
+    prettyPage = { source: page, count: beautifiedCount, page: next };
+    return next;
+  }
+
+  /** One element's handlers: inline ones read here, the rest from the page read. */
+  function handlersOf(element: Element): script.ScriptHandler[] {
+    return script.mergeHandlers(script.inlineHandlers(element), pageHandlers?.get(element) ?? []);
+  }
+
+  /** Whether the tree should mark an element as having JavaScript wired to it. */
+  function hasScript(element: Element): boolean {
+    return (pageHandlers?.has(element) ?? false) || script.inlineHandlers(element).length > 0;
+  }
 
   function ensurePseudoStates(): edit.PseudoStateController {
     pseudoStates ??= edit.createPseudoStateController(doc);
@@ -429,7 +602,12 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
         // Settle the cache key first, or the next page scan would see this
         // page as a new one and discard the audit just run against it.
         dropStaleCaches();
-        scanner ??= createPageScanner({ doc, view: win, ignore: isOurs });
+        scanner ??= createPageScanner({
+          doc,
+          view: win,
+          ignore: isOurs,
+          styleIndex: ensureStyleIndex,
+        });
         contrastAudit = scanner.auditContrast();
         scheduleRender();
       },
@@ -437,6 +615,18 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
       /** Jump to a failing element from the audit list. */
       selectElement(element: Element): void {
         selectElement(element);
+      },
+
+      focusBox(focus: BoxFocus | null): void {
+        const same =
+          focus === boxFocus ||
+          (focus !== null &&
+            boxFocus !== null &&
+            focus.region === boxFocus.region &&
+            focus.side === boxFocus.side);
+        if (same) return;
+        boxFocus = focus;
+        scheduleRender();
       },
 
       /**
@@ -491,6 +681,7 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
     if (!element.isConnected) return;
     pinnedElement = element;
     currentElement = element;
+    structure?.reveal(element);
     panel?.setPinned(true);
     scheduleSettledScan(element);
     scheduleRender();
@@ -514,16 +705,118 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
     if (next) selectElement(next);
   }
 
+  function applySettings(next: Partial<InspectorSettings>): void {
+    settings = normalizeSettings({ ...settings, ...next });
+    if (next.panel) panel?.setPlacement(settings.panel);
+    panel?.setTheme(settings.theme);
+
+    // The exports are written in the colour notation, so they are rebuilt.
+    // `scan` reuses the document walk it already did; only the text changes.
+    const shown = pinnedElement ?? currentElement;
+    if (pageData && scanner && shown) pageData = scanner.scan(shown, settings.colorFormat);
+    if (active) scheduleRender();
+  }
+
+  function structureApi(): StructureApi {
+    return {
+      setOpen(open) {
+        structure ??= createStructureModel(doc, { ignore: isOurs, hasScript });
+        structure.setOpen(open);
+
+        // Opening shows where you are; it is the one reveal not made by a
+        // selection, since the panel may be following the pointer.
+        const shown = pinnedElement ?? currentElement;
+        if (open && shown) structure.reveal(shown);
+        if (!open) previewElement = null;
+        scheduleRender();
+      },
+
+      setExpanded(id, expanded) {
+        structure?.setExpanded(id, expanded);
+        scheduleRender();
+      },
+
+      showMore(id) {
+        structure?.showMore(id);
+        scheduleRender();
+      },
+
+      setAllExpanded(expanded) {
+        structure?.setAllExpanded(expanded);
+        scheduleRender();
+      },
+
+      setScriptOnly(on) {
+        structure?.setScriptOnly(on);
+        scheduleRender();
+      },
+
+      setQuery(query) {
+        structure?.setQuery(query);
+        // Clearing a search goes back to the tree, opened down to where you are.
+        const shown = pinnedElement ?? currentElement;
+        if (!query.trim() && shown) structure?.reveal(shown);
+        scheduleRender();
+      },
+
+      preview(id) {
+        const next = id === null ? null : (structure?.elementFor(id) ?? null);
+        if (next === previewElement) return;
+        previewElement = next;
+        scheduleRender();
+      },
+
+      select(id) {
+        const element = structure?.elementFor(id);
+        if (!element) return;
+        previewElement = null;
+        selectElement(element);
+        scrollIntoViewIfHidden(element);
+      },
+    };
+  }
+
+  /**
+   * Bring a selection made from the tree on screen, if it is not already.
+   *
+   * Only off-screen elements move the page: scrolling one that is already in
+   * view would shift what you were looking at for no reason. An element that
+   * renders no box (`<head>`, `display: none`) measures as all zeros and is
+   * left alone, since there is nothing to scroll to.
+   */
+  function scrollIntoViewIfHidden(element: Element): void {
+    const rect = element.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) return;
+
+    const offscreen =
+      rect.bottom < 0 || rect.top > win.innerHeight || rect.right < 0 || rect.left > win.innerWidth;
+    if (offscreen) element.scrollIntoView({ block: 'center', inline: 'nearest' });
+  }
+
   function ensurePanel(): PanelHandle | null {
     if (!wantsPanel) return null;
-    panel ??= createPanel({
+    panel ??= (options.surface ?? createPanel)({
       doc,
       editing: editingApi(),
+      structure: structureApi(),
       onTogglePicking: () => setPicking(!picking),
+      settingsSaved: options.onSettingsChange !== undefined,
+      placement: settings.panel,
+      theme: settings.theme,
+      // Saved as it is, without a repaint: the panel has already moved.
+      onPlacementChange: (placement) => {
+        settings = { ...settings, panel: placement };
+        options.onSettingsChange?.(settings);
+      },
+      onChangeSettings: (next: Partial<InspectorSettings>) => {
+        applySettings(next);
+        options.onSettingsChange?.(settings);
+      },
       onSelectAncestor: selectAncestor,
       onStep: stepSelection,
       onClose: requestClose,
       onCancelClose: cancelClose,
+      onSetUpDevtools: options.setUpDevtools,
       onPinnedChange: (isPinned) => {
         if (!isPinned) {
           pinnedElement = null;
@@ -548,8 +841,12 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
     surface.update(buildData(element, null));
   }
 
-  /** Paint the overlay and panel for one element. Must stay cheap. */
-  function show(element: Element, boundary: PanelData['boundary']): void {
+  /** Draw the highlight over one element, or over one part of its box. */
+  function paintOverlay(
+    element: Element,
+    boundary: PanelData['boundary'],
+    focus: BoxFocus | null = null,
+  ): void {
     const descriptor = describeElement(element);
 
     ensureOverlay().show({
@@ -557,7 +854,14 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
       selectorLabel: descriptor.selectorLabel,
       dimensions: formatDimensions(descriptor.width, descriptor.height),
       boundary,
+      focus,
+      script: hasScript(element),
     });
+  }
+
+  /** Paint the overlay and panel for one element. Must stay cheap. */
+  function show(element: Element, boundary: PanelData['boundary']): void {
+    paintOverlay(element, boundary);
 
     const surface = ensurePanel();
     if (!surface) return;
@@ -569,9 +873,24 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
     const collect = options.collect;
     const data = collect
       ? collect(element, win)
-      : collectElementData(element, win, { styleIndex: ensureStyleIndex(), ignore: isOurs });
+      : collectElementData(element, win, {
+          styleIndex: ensureStyleIndex(),
+          ignore: isOurs,
+          colorFormat: settings.colorFormat,
+        });
 
     data.boundary = boundary;
+    data.settings = settings;
+    data.handlers = handlersOf(element).map((handler) => {
+      const source = pretty(handler.source);
+      return source === handler.source ? handler : { ...handler, source };
+    });
+    data.handlersRead = pageHandlersRead ? 'page' : 'inline';
+
+    // Rebuilt on every paint while the drawer is open, which keeps it true to
+    // a page that is changing underneath it. The walk covers only expanded
+    // rows, so its cost follows what is on screen.
+    if (structure?.open) data.structure = structure.build(element);
 
     if (pseudoStates) {
       data.pseudoStates = {
@@ -617,7 +936,7 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
     // Page-wide findings persist across hovers: the palette does not change
     // because the pointer moved. Breakpoints refresh on the next settle.
     if (pageData) {
-      data.page = pageData;
+      data.page = withPrettyScripts(pageData);
       data.exports = pageData.exports;
     }
 
@@ -662,8 +981,14 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
      * rides along with the page scan instead of blocking the first paint.
      */
     ensurePseudoStates();
+    void ensurePageHandlers();
 
-    scanner ??= createPageScanner({ doc, view: win, ignore: isOurs });
+    scanner ??= createPageScanner({
+      doc,
+      view: win,
+      ignore: isOurs,
+      styleIndex: ensureStyleIndex,
+    });
     const pageScanner = scanner;
     // The document walk yields between phases, so the page stays responsive
     // while it runs. Anything can happen in those gaps — a close, a new
@@ -671,10 +996,15 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
     await pageScanner.warm();
     if (!active || !element.isConnected || scanner !== pageScanner || token !== settleToken) return;
 
-    pageData = pageScanner.scan(element);
+    pageData = pageScanner.scan(element, settings.colorFormat);
 
-    // Repaint with the deep findings merged in.
-    if (currentElement) show(currentElement, null);
+    /**
+     * Repaint with the deep findings merged in — through `render`, like every
+     * other repaint. Calling `show` here directly used to redraw the plain
+     * highlight a quarter-second after a selection, wiping out a hovered tree
+     * row or box-model part, and drawing it even with the picker off.
+     */
+    scheduleRender();
   }
 
   /**
@@ -703,6 +1033,8 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
     styleIndex = null;
     scanner?.invalidate();
     pageData = undefined;
+    pageHandlers = null;
+    pageHandlersRead = false;
     contrastAudit = null;
     // The page-wide findings were just dropped; fetch the new page's.
     const selected = pinnedElement ?? currentElement;
@@ -710,12 +1042,37 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
   }
 
   function render(): void {
-    // Disarmed: keep showing the held element's data, but paint nothing over
-    // the page. The user asked for the page back.
-    if (!picking && pinnedElement) {
-      if (pinnedElement.isConnected) {
+    renderSelection();
+
+    // A row hovered in the structure drawer takes the highlight for as long
+    // as the pointer is on it, whether or not the picker is armed.
+    if (previewElement) {
+      if (previewElement.isConnected) paintOverlay(previewElement, null);
+      else previewElement = null;
+      return;
+    }
+
+    // So does a part of the diagram: the pointer is on the box model, and the
+    // page shows which part of the element that is, with the picker on or off.
+    const shown = pinnedElement ?? currentElement;
+    if (boxFocus && shown?.isConnected) paintOverlay(shown, null, boxFocus);
+  }
+
+  function renderSelection(): void {
+    /**
+     * Disarmed with the tree closed: keep showing the held element's data, but
+     * paint nothing over the page. The user asked for the page back.
+     *
+     * The open tree counts as asking for the highlight. Choosing a row is
+     * choosing something on the page, and with the picker off the highlight
+     * is the only place that choice would otherwise show.
+     */
+    const highlighting = picking || (structure?.open ?? false);
+    const held = pinnedElement ?? currentElement;
+    if (!highlighting && held) {
+      if (held.isConnected) {
         overlay?.hide();
-        showPanelOnly(pinnedElement);
+        showPanelOnly(held);
       }
       return;
     }
@@ -771,6 +1128,15 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
   function onPointerMove(event: Event): void {
     // A held selection is held: hover-following resumes only once released.
     if (pinnedElement) return;
+    /**
+     * The pointer over our own panel is not pointing at the page.
+     *
+     * Probing there looks straight through the panel and inspects whatever
+     * sits underneath it, so reaching for a tree row used to swap the
+     * selection for some element behind the panel on the way. Events from
+     * inside the shadow root arrive retargeted to its host.
+     */
+    if (event.target instanceof Element && isOurs(event.target)) return;
     const pointer = event as PointerEvent;
     pointerX = pointer.clientX;
     pointerY = pointer.clientY;
@@ -831,6 +1197,19 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
     }
 
     if (key !== 'Escape') return;
+
+    /*
+     * A field in the panel (the filter, a value being edited) answers Escape
+     * itself, by clearing or cancelling, and so does a part of the panel
+     * marked `data-owns-escape`, like the tree while a search narrows it.
+     * This listener captures, so it hears the key before either can stop it,
+     * and has to stand aside. The panel's shadow root is open, so the path
+     * reaches them.
+     */
+    const path = event.composedPath();
+    const target = path[0] as Node | undefined;
+    const owned = path.some((node) => (node as Element).hasAttribute?.('data-owns-escape'));
+    if (focusInPanel && (owned || (target?.nodeType === 1 && isEditable(target as Element)))) return;
 
     /**
      * Escape unwinds one step at a time, never more.
@@ -941,6 +1320,7 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
     // sets currentElement itself — so a tap with no hover frame before it (a
     // touch or pen, or a click straight after activating) would never get one.
     if (pinnedElement && currentElement !== pinnedElement) scheduleSettledScan(pinnedElement);
+    if (pinnedElement) structure?.reveal(pinnedElement);
     currentElement = result.element;
     panel?.setPinned(pinnedElement !== null);
     scheduleRender();
@@ -1047,6 +1427,9 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
      * reopening on the same page does not pay for the document walk twice.
      */
     contrastAudit = null;
+    structure = null;
+    previewElement = null;
+    boxFocus = null;
     overrides?.clearAll();
     pseudoStates?.destroy();
     pseudoStates = null;
@@ -1074,8 +1457,20 @@ export function createInspectorSession(options: SessionOptions = {}): InspectorS
       return picking;
     },
     setPicking,
+    updateSettings: applySettings,
     get pinned() {
       return pinnedElement !== null;
+    },
+    get selected() {
+      return pinnedElement;
+    },
+    select(element: Element) {
+      if (active) selectElement(element);
+    },
+    replaceSurface() {
+      panel?.destroy();
+      panel = null;
+      if (active) scheduleRender();
     },
     activate,
     deactivate,

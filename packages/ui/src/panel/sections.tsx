@@ -6,37 +6,63 @@ import type {
   RuleInfo,
   ScaleInfo,
 } from './view-model.js';
-import { Badge, CopyButton, Empty, Group, Meter, Rows, Swatch, copyText } from './primitives.jsx';
+import {
+  Badge,
+  CodeBlock,
+  CopyButton,
+  Empty,
+  Group,
+  Rows,
+  Swatch,
+  copyText,
+  formatBytes,
+} from './primitives.jsx';
 import { ChangesSection, EditableRows, PseudoStates, useEditing } from './editing.jsx';
 import { BoxDiagram } from './box-diagram.jsx';
-import { assetUrlList, downloadAsset } from './download.js';
-import { color } from '@open-inspector/core';
+import { assetUrlList, downloadAsset, safeFilename, withExtension } from './download.js';
+import { color, svg } from '@open-inspector/core';
 import { useSearch } from './search.jsx';
+import { SvgTool } from './svg-tool.jsx';
+import { Icon } from './icons.jsx';
+import type { CodeLanguage } from './highlight.jsx';
 
 /** Shared shape: every section renders from `PanelData` and nothing else. */
 interface SectionProps {
   data: PanelData;
 }
 
-function ColorChip({ entry }: { entry: ColorEntry }) {
+/** A colour entry written in the chosen notation; hex when that one is missing. */
+function colorText(entry: ColorEntry, format: color.ColorFormat): string {
+  return entry[format] ?? entry.hex;
+}
+
+function ColorChip({ entry, format }: { entry: ColorEntry; format: color.ColorFormat }) {
+  const text = colorText(entry, format);
   return (
     <button
       type="button"
       class="chip"
-      title={`${entry.hex} · ${entry.role}${entry.merged ? ` · ${entry.merged} similar merged` : ''}`}
-      onClick={(event) => void copyText(entry.hex, event.currentTarget)}
+      title={`${text} · ${entry.role}${entry.merged ? ` · ${entry.merged} similar merged` : ''}`}
+      onClick={(event) => void copyText(text, event.currentTarget)}
     >
       <Swatch color={entry.hex} />
-      <span>{entry.hex}</span>
+      <span>{text}</span>
       {entry.usage != null ? <span class="count">{entry.usage}</span> : null}
     </button>
   );
 }
 
-function Palette({ entries }: { entries: ColorEntry[] }) {
+function Palette({ entries, format }: { entries: ColorEntry[]; format: color.ColorFormat }) {
   const query = useSearch().trim().toLowerCase();
+  // Searchable in every notation, so a hex pasted from a design file still
+  // finds the colour while the panel shows it as oklch.
   const visible = query
-    ? entries.filter((entry) => `${entry.hex} ${entry.role}`.toLowerCase().includes(query))
+    ? entries.filter((entry) =>
+        [entry.hex, entry.hexa, entry.rgb, entry.hsl, entry.oklch, entry.role]
+          .join(' ')
+          .toLowerCase()
+          .includes(query),
+      )
     : entries;
 
   if (visible.length === 0) return null;
@@ -44,16 +70,44 @@ function Palette({ entries }: { entries: ColorEntry[] }) {
   return (
     <div class="palette">
       {visible.map((entry) => (
-        <ColorChip key={entry.hex + entry.role} entry={entry} />
+        <ColorChip key={entry.hex + entry.role} entry={entry} format={format} />
       ))}
     </div>
   );
 }
 
-function Scale({ scale, unit }: { scale: ScaleInfo; unit: string }) {
+/**
+ * The largest a type sample is drawn. Display sizes past it would make one
+ * row taller than the rest of the ladder together; the label carries the
+ * real size.
+ */
+const TYPE_SAMPLE_MAX_PX = 40;
+
+/**
+ * A scale as a ladder: its most-used values, smallest first, each drawn so
+ * the steps can be compared by eye — a type sample at its size, or a bar for
+ * a length of spacing. A value that breaks the scale is marked on its own
+ * row, where it sits among the values it should have been.
+ *
+ * Spacing bars are twice their real length, over a ruler that ticks off the
+ * base unit: a value on the scale ends on a tick, an outlier between two.
+ * Bars too long for the track stop at its end; the label has the length.
+ *
+ * Beside each value, the custom property to write instead of the number,
+ * copied by a click: the page's own when it declares one for that length,
+ * otherwise the Export tab's name, in a quieter ink and explained by the
+ * legend, so it never passes for the page's.
+ */
+function Scale({ scale, unit }: { scale: ScaleInfo; unit: 'type' | 'spacing' }) {
   if (scale.kind === 'none') {
     return <Empty>No consistent {unit} scale — the values do not follow one base.</Empty>;
   }
+
+  const values = scale.values ?? [];
+  const offScale = values.some((value) => !value.onScale);
+  const exportNames = values.some(
+    (value) => value.variablesFrom === 'export' && value.variables.length > 0,
+  );
 
   return (
     <>
@@ -62,30 +116,65 @@ function Scale({ scale, unit }: { scale: ScaleInfo; unit: string }) {
         <span class="row-value">
           <span>{scale.base}</span>
           {scale.conformance != null ? (
-            <span class="row-detail">{scale.conformance}% conform</span>
+            <span class="row-detail">
+              {scale.conformance}% of {unit === 'type' ? 'sizes' : 'uses'} on scale
+            </span>
           ) : null}
         </span>
         <CopyButton text={scale.base ?? ''} />
       </div>
-      {scale.conformance != null ? <Meter percent={scale.conformance} /> : null}
-      {scale.values && scale.values.length > 0 ? (
-        <div class="palette">
-          {scale.values.map((value) => (
-            <span key={value.value} class="chip">
-              <span>{value.value}</span>
-              <span class="count">{value.count}</span>
-            </span>
+      {values.length > 0 ? (
+        <ul
+          class="scale"
+          data-unit={unit}
+          style={scale.step ? { '--scale-tick': `${scale.step * 2}px` } : undefined}
+        >
+          {values.map((value) => (
+            <li key={value.value} class="scale-row" data-off={value.onScale ? undefined : 'true'}>
+              <span class="scale-value">
+                {value.value}
+                {value.onScale ? null : <span class="sr-only"> (off scale)</span>}
+              </span>
+              {unit === 'type' ? (
+                <span
+                  class="scale-sample"
+                  aria-hidden="true"
+                  style={{ fontSize: `${Math.min(value.px, TYPE_SAMPLE_MAX_PX)}px` }}
+                >
+                  Aa
+                </span>
+              ) : (
+                <span class="scale-track" aria-hidden="true">
+                  <span class="scale-bar" style={{ width: `${Math.abs(value.px) * 2}px` }} />
+                </span>
+              )}
+              <span class="scale-vars" data-from={value.variablesFrom}>
+                {value.variables.map((name) => (
+                  <CopyButton key={name} text={name} label={name} />
+                ))}
+              </span>
+              <span class="scale-count">
+                <span class="sr-only">used </span>
+                {value.count}
+                <span class="sr-only"> times</span>
+              </span>
+            </li>
           ))}
-        </div>
+        </ul>
       ) : null}
-      {scale.outliers && scale.outliers.length > 0 ? (
-        <div class="row">
-          <span class="row-label">outliers</span>
-          <span class="row-value">
-            <span>{scale.outliers.join(', ')}</span>
+      {offScale ? (
+        <p class="scale-legend">
+          <span class="scale-key" aria-hidden="true" />
+          {unit === 'type' ? 'off the scale' : `off the ${scale.base} grid`}
+        </p>
+      ) : null}
+      {exportNames ? (
+        <p class="scale-legend">
+          <span class="scale-key-name" aria-hidden="true">
+            --{unit === 'type' ? 'text' : 'space'}
           </span>
-          <CopyButton text={scale.outliers.join(', ')} />
-        </div>
+          names the page has no variable for, as the Export tab writes them
+        </p>
       ) : null}
     </>
   );
@@ -249,7 +338,7 @@ function Eyedropper() {
   const formats = picked ? color.formatColor(picked) : null;
 
   return (
-    <Group title="Sample a colour">
+    <Group title="Sample a color">
       <div class="export-actions">
         <button
           type="button"
@@ -275,6 +364,7 @@ function Eyedropper() {
         <Rows
           fields={[
             { label: 'hex', value: formats.hex, swatch: formats.hex, copy: formats.hex },
+            { label: 'hexa', value: formats.hexa, copy: formats.hexa },
             { label: 'rgb', value: formats.rgb, copy: formats.rgb },
             { label: 'hsl', value: formats.hsl, copy: formats.hsl },
             { label: 'oklch', value: formats.oklch, copy: formats.oklch },
@@ -358,12 +448,13 @@ function ContrastAuditSection() {
 
 export function ColorSection({ data }: SectionProps) {
   const { contrast, page } = data;
+  const format = data.settings?.colorFormat ?? 'hex';
 
   return (
     <>
       <Group title="On this element">
         {data.colors.length === 0 ? (
-          <Empty>This element declares no colours of its own.</Empty>
+          <Empty>This element declares no colors of its own.</Empty>
         ) : (
           // Colours that came from exactly one declaration carry it, and are
           // editable with a picker. A shadow or gradient stop lives inside a
@@ -372,9 +463,10 @@ export function ColorSection({ data }: SectionProps) {
           <EditableRows
             fields={data.colors.map((entry) => ({
               label: entry.role,
-              value: entry.hex,
-              detail: entry.rgb,
-              copy: entry.hex,
+              value: colorText(entry, format),
+              // The second notation beside it: hex, or rgb when hex is the first.
+              detail: format === 'hex' || format === 'hexa' ? entry.rgb : entry.hex,
+              copy: colorText(entry, format),
               swatch: entry.hex,
               property: entry.property,
             }))}
@@ -435,9 +527,9 @@ export function ColorSection({ data }: SectionProps) {
         {!page ? (
           <Empty>Scanning…</Empty>
         ) : page.palette.length === 0 ? (
-          <Empty>No colours found.</Empty>
+          <Empty>No colors found.</Empty>
         ) : (
-          <Palette entries={page.palette} />
+          <Palette entries={page.palette} format={format} />
         )}
       </Group>
     </>
@@ -569,61 +661,77 @@ export function LayoutSection({ data }: SectionProps) {
  * `icon.svg` entries is a list of twelve identical rows. Seeing the thing is
  * the entire point of an asset browser.
  */
+/** An asset's SVG markup, when it is one that can be read without a request. */
+function svgMarkupOf(asset: AssetEntry): string | null {
+  if (asset.kind === 'inline svg') return asset.url;
+  return svg.decodeSvgDataUri(asset.url);
+}
+
 function AssetRow({ asset }: { asset: AssetEntry }) {
   const editing = useEditing();
   const [failed, setFailed] = useState(false);
+  const [optimizing, setOptimizing] = useState(false);
   const showImage = asset.preview && !failed;
+  const markup = svgMarkupOf(asset);
 
   return (
-    <div class="asset">
-      <div class="asset-thumb" data-empty={!showImage}>
-        {showImage ? (
-          <img src={asset.preview} alt="" loading="lazy" onError={() => setFailed(true)} />
-        ) : (
-          <span class="asset-thumb-note">{failed ? 'unavailable' : (asset.noPreview ?? '—')}</span>
-        )}
-      </div>
+    <>
+      <div class="asset">
+        <div class="asset-thumb" data-empty={!showImage}>
+          {showImage ? (
+            <img src={asset.preview} alt="" loading="lazy" onError={() => setFailed(true)} />
+          ) : (
+            <span class="asset-thumb-note">{failed ? 'unavailable' : (asset.noPreview ?? '—')}</span>
+          )}
+        </div>
 
-      <div class="asset-body">
-        <span class="asset-name" title={asset.url || asset.name}>
-          {asset.name}
-        </span>
-        <span class="asset-meta">
-          {[
-            asset.dimensions,
-            asset.bytes != null ? formatBytes(asset.bytes) : null,
-            asset.usage && asset.usage > 1 ? `${asset.usage}×` : null,
-          ]
-            .filter(Boolean)
-            .join(' · ')}
-        </span>
-      </div>
+        <div class="asset-body">
+          <span class="asset-name" title={asset.url || asset.name}>
+            {asset.name}
+          </span>
+          <span class="asset-meta">
+            {[
+              asset.dimensions,
+              asset.bytes != null ? formatBytes(asset.bytes) : null,
+              asset.usage && asset.usage > 1 ? `${asset.usage}×` : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </span>
+        </div>
 
-      <div class="asset-actions">
-        {asset.url ? (
-          <button
-            type="button"
-            class="copy"
-            title={
-              asset.kind === 'inline svg'
-                ? 'Save as an .svg file'
-                : 'Save this file (the browser fetches it, from cache where it can)'
-            }
-            onClick={() => downloadAsset(asset, editing?.save)}
-          >
-            save
-          </button>
-        ) : null}
-        <CopyButton text={asset.url || asset.name} label="copy" />
+        <div class="asset-actions">
+          {asset.url ? (
+            <button
+              type="button"
+              class="copy copy-icon"
+              onClick={() => downloadAsset(asset, editing?.save)}
+            >
+              <Icon name="export" size={12} />
+              <span class="tab-label">{asset.kind === 'inline svg' ? 'Save as .svg' : 'Save file'}</span>
+            </button>
+          ) : null}
+          <CopyButton text={asset.url || asset.name} />
+          {markup ? (
+            <button
+              type="button"
+              class="copy"
+              aria-expanded={optimizing}
+              title="Optimize, minify or beautify this SVG"
+              onClick={() => setOptimizing(!optimizing)}
+            >
+              optimize
+            </button>
+          ) : null}
+        </div>
       </div>
-    </div>
+      {markup && optimizing ? (
+        <div class="asset-svg">
+          <SvgTool source={markup} filename={withExtension(safeFilename(asset.name, 'image'), 'svg')} />
+        </div>
+      ) : null}
+    </>
   );
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export function AssetsSection({ data }: SectionProps) {
@@ -676,6 +784,46 @@ export function AssetsSection({ data }: SectionProps) {
   );
 }
 
+/** The grammar for each source heading `collect` writes. */
+const SOURCE_LANGUAGES: Record<string, CodeLanguage> = {
+  CSS: 'css',
+  JavaScript: 'javascript',
+  JSON: 'json',
+  HTML: 'markup',
+};
+
+/**
+ * The Styles tab for an element that does not render.
+ *
+ * A `<style>` or `<script>` has no box: its box model is all zeros and its
+ * matched rules are whatever `*` sets. The code it carries is the thing to
+ * see, so that is what the tab shows instead.
+ */
+export function SourceSection({ data }: SectionProps) {
+  const source = data.source;
+  if (!source) return null;
+
+  return (
+    <>
+      <ChangesSection
+        edits={data.edits ?? []}
+        css={data.editsCss ?? ''}
+        prompt={data.editsPrompt ?? ''}
+      />
+
+      <Group title={`Source · ${source.language}`}>
+        {source.text ? (
+          <CodeBlock text={source.text} language={SOURCE_LANGUAGES[source.language]} />
+        ) : null}
+        {source.note ? <Empty>{source.note}</Empty> : null}
+        {source.truncated ? (
+          <Empty>This is long enough that only the first 100,000 characters are shown.</Empty>
+        ) : null}
+      </Group>
+    </>
+  );
+}
+
 /**
  * The element, written back out as source.
  *
@@ -684,11 +832,13 @@ export function AssetsSection({ data }: SectionProps) {
  * their codebase. See core/markup for exactly what is dropped.
  */
 export function MarkupSection({ data }: SectionProps) {
-  const [dialect, setDialect] = useState<'html' | 'jsx'>('html');
+  const [chosen, setDialect] = useState<'html' | 'jsx' | 'svg'>('html');
 
   if (!data.markup) return <Empty>Select an element to see its markup.</Empty>;
 
-  const text = data.markup[dialect];
+  // The SVG view exists only while an <svg> is selected; move off one and
+  // the panel falls back to HTML rather than showing nothing.
+  const dialect = chosen === 'svg' && !data.svgSource ? 'html' : chosen;
 
   return (
     <>
@@ -700,23 +850,56 @@ export function MarkupSection({ data }: SectionProps) {
           <button type="button" aria-pressed={dialect === 'jsx'} onClick={() => setDialect('jsx')}>
             JSX
           </button>
+          {data.svgSource ? (
+            <button
+              type="button"
+              aria-pressed={dialect === 'svg'}
+              title="Optimize, minify or beautify this SVG"
+              onClick={() => setDialect('svg')}
+            >
+              SVG
+            </button>
+          ) : null}
         </div>
       </Group>
 
-      <Group title="Markup">
-        <div class="export-actions">
-          <CopyButton text={text} label="copy" />
-        </div>
-        {/* Focusable, so a keyboard user can scroll a long export. */}
-        <pre tabIndex={0}>{text}</pre>
-        <Empty>
-          Framework attributes, scripts and inline styles are stripped, and the subtree stops at six
-          levels — this is markup to paste, not a recording of the live DOM.
-        </Empty>
-      </Group>
+      {dialect === 'svg' && data.svgSource ? (
+        <Group title="SVG">
+          <SvgTool
+            source={data.svgSource}
+            filename={withExtension(safeFilename(data.selectorLabel, 'image'), 'svg')}
+          />
+        </Group>
+      ) : (
+        <MarkupText
+          text={data.markup[dialect === 'jsx' ? 'jsx' : 'html']}
+          language={dialect === 'jsx' ? 'jsx' : 'markup'}
+        />
+      )}
     </>
   );
 }
+
+function MarkupText({ text, language }: { text: string; language: CodeLanguage }) {
+  return (
+    <Group title="Markup">
+      <CodeBlock text={text} language={language} />
+      <Empty>
+        Framework attributes, scripts and inline styles are stripped, and the subtree stops at six
+        levels — this is markup to paste, not a recording of the live DOM.
+      </Empty>
+    </Group>
+  );
+}
+
+/** The grammar for each export format; the AI handoff is prose, and stays plain. */
+const EXPORT_LANGUAGES: Record<string, CodeLanguage> = {
+  css: 'css',
+  tailwind: 'javascript',
+  json: 'json',
+  w3c: 'json',
+  scss: 'scss',
+};
 
 export function ExportSection({ data }: SectionProps) {
   const formats = data.exports ?? [];
@@ -747,10 +930,7 @@ export function ExportSection({ data }: SectionProps) {
       </Group>
 
       <Group title={current.label}>
-        <div class="export-actions">
-          <CopyButton text={current.text} label="copy all" />
-        </div>
-        <pre tabIndex={0}>{current.text}</pre>
+        <CodeBlock text={current.text} language={EXPORT_LANGUAGES[current.id]} />
       </Group>
     </>
   );

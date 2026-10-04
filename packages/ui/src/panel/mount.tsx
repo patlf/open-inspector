@@ -2,6 +2,13 @@ import { render } from 'preact';
 import { lockHost, raiseToTopLayer } from '../host.js';
 import { Panel } from './Panel.jsx';
 import { EditingContext, type EditingApi } from './editing.jsx';
+import type { StructureApi } from './structure-tree.jsx';
+import {
+  DEFAULT_SETTINGS,
+  type InspectorSettings,
+  type PanelPlacement,
+  type ThemeSetting,
+} from '../settings.js';
 import { PANEL_STYLES } from './panel-styles.js';
 import { BOX_DIAGRAM_STYLES } from './box-diagram.jsx';
 import type { PanelData } from './view-model.js';
@@ -20,6 +27,13 @@ export interface PanelHandle {
   setConfirmClose(pending: number | null): void;
   /** Move back above anything that entered the top layer after us. */
   raise(): void;
+  /**
+   * Put the panel where it was saved. Ignored once it has been moved here: a
+   * saved position read late must not yank the panel out from under a drag.
+   */
+  setPlacement(placement: PanelPlacement): void;
+  /** Follow the system's light or dark, or keep to one whatever it says. */
+  setTheme(theme: ThemeSetting): void;
   /** True if the element belongs to the panel — used to avoid inspecting ourselves. */
   owns(element: Element): boolean;
   destroy(): void;
@@ -33,12 +47,26 @@ export interface PanelOptions {
   onPinnedChange?: (pinned: boolean) => void;
   /** The Inspect button was pressed. */
   onTogglePicking?: () => void;
+  /** A setting was changed in the panel. Omit and the panel offers no settings. */
+  onChangeSettings?: (next: Partial<InspectorSettings>) => void;
+  /** Whether those changes are kept beyond this session. */
+  settingsSaved?: boolean;
+  /** Where the panel opens. Defaults to docked right. */
+  placement?: PanelPlacement;
+  /** The panel was moved, docked or resized and has settled there. */
+  onPlacementChange?: (placement: PanelPlacement) => void;
+  /** Light, dark, or whichever the system uses. Defaults to the system's. */
+  theme?: ThemeSetting;
   /** A breadcrumb entry was clicked; depth 0 is the current element. */
   onSelectAncestor?: (depth: number) => void;
   /** A tree step arrow was pressed. */
   onStep?: (direction: 'parent' | 'child' | 'previous' | 'next') => void;
   /** Omit to render a read-only panel. */
   editing?: EditingApi;
+  /** Omit and the structure drawer is not offered. */
+  structure?: StructureApi;
+  /** Opens the page that turns on the Firefox DevTools tab. Omit where there is none. */
+  onSetUpDevtools?: (() => void) | undefined;
 }
 
 /**
@@ -71,7 +99,8 @@ function lockHostGeometry(host: HTMLElement): void {
   lockHost(host, rules);
 }
 
-function applyStyles(shadow: ShadowRoot): void {
+/** The panel's stylesheet, into a shadow root of its own: the page's, or a DevTools tab's. */
+export function applyStyles(shadow: ShadowRoot): void {
   const css = `${PANEL_STYLES}\n${BOX_DIAGRAM_STYLES}`;
 
   if (typeof CSSStyleSheet !== 'undefined' && 'replaceSync' in CSSStyleSheet.prototype) {
@@ -109,7 +138,10 @@ export function createPanel(options: PanelOptions): PanelHandle {
   let data: PanelData | null = null;
   let pinned = false;
   let picking = true;
-  let side: 'left' | 'right' = 'right';
+  let placement = options.placement ?? DEFAULT_SETTINGS.panel;
+  let movedHere = false;
+  let theme = options.theme ?? DEFAULT_SETTINGS.theme;
+  const view = doc.defaultView ?? window;
   let confirmClose: number | null = null;
   let attached = false;
 
@@ -126,15 +158,23 @@ export function createPanel(options: PanelOptions): PanelHandle {
         data={data}
         pinned={pinned}
         picking={picking}
-        side={side}
+        placement={placement}
+        theme={theme}
+        view={view}
         onTogglePicking={() => options.onTogglePicking?.()}
         onSelectAncestor={(depth) => options.onSelectAncestor?.(depth)}
         onStep={(direction) => options.onStep?.(direction)}
-        onFlip={() => {
-          side = side === 'right' ? 'left' : 'right';
+        structure={options.structure}
+        onChangeSettings={options.onChangeSettings}
+        settingsSaved={options.settingsSaved ?? false}
+        onPlace={(next, commit) => {
+          placement = next;
+          movedHere = true;
           paint();
+          if (commit) options.onPlacementChange?.(next);
         }}
         onClose={options.onClose}
+        onSetUpDevtools={options.onSetUpDevtools}
         confirmClose={confirmClose}
         onCancelClose={() => options.onCancelClose?.()}
       />
@@ -168,6 +208,16 @@ export function createPanel(options: PanelOptions): PanelHandle {
     },
     raise() {
       if (attached && host.isConnected) raiseToTopLayer(host as HTMLElement);
+    },
+    setPlacement(next) {
+      if (movedHere) return;
+      placement = next;
+      paint();
+    },
+    setTheme(next) {
+      if (theme === next) return;
+      theme = next;
+      paint();
     },
     owns(element) {
       return element === host || host.contains(element);

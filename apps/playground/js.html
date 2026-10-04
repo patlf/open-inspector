@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Open Inspector JS fixture</title>
+    <style>
+      body { margin: 0; font: 15px/1.5 system-ui, sans-serif; color: #14181c; background: #f4f5f6; }
+      main { max-width: 36rem; margin: 0 2rem; padding: 2rem 0; display: grid; gap: 1rem; justify-items: start; }
+      button, a, p { font: inherit; }
+    </style>
+  </head>
+  <body>
+    <!--
+      One element per way a handler can be attached, for the JS view. No
+      inspector session of its own: the only one here is the extension's.
+      React and Vue are imitated by what they leave on an element — the same
+      thing the probe reads — rather than loaded from anywhere.
+    -->
+    <main>
+      <button id="inline" onclick="return false">Inline attribute</button>
+      <button id="property">Property</button>
+      <button id="react">React prop</button>
+      <button id="vue">Vue listener</button>
+      <a id="js-link" href="javascript:void 0">javascript: link</a>
+      <p id="plain">No handlers at all</p>
+    </main>
+    <!-- On one line on purpose, as a minifier leaves it: the JS tab shows it formatted. -->
+    <script>document.getElementById('property').onclick=function saveDraft(){};document.getElementById('react')['__reactProps$fixture']={onClick:function openDialog(){},children:'React prop'};document.getElementById('vue')._vei={onInput:{value:function syncField(){}}};</script>
+  </body>
+</html>

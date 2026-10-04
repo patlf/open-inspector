@@ -9,3 +9,4 @@
 export * from './types.js';
 export * from './naming.js';
 export * from './emit.js';
+export * from './variables.js';

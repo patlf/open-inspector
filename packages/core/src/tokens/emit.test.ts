@@ -230,3 +230,24 @@ describe('emitAll', () => {
     }
   });
 });
+
+describe('the chosen colour notation', () => {
+  const OKLCH: TokenSet = {
+    ...SET,
+    colors: [{ hex: '#ffffff', value: 'oklch(1 0 0)', role: 'background', usage: 90 }],
+  };
+
+  it('is what the formats that take any CSS colour write out', () => {
+    expect(emitCssVariables(OKLCH)).toContain(': oklch(1 0 0);');
+    expect(emitScssVariables(OKLCH)).toContain(': oklch(1 0 0);');
+    expect(emitTailwindConfig(OKLCH)).toContain("'oklch(1 0 0)'");
+    expect(emitJson(OKLCH)).toContain('"oklch(1 0 0)"');
+    expect(emitLlmHandoff(OKLCH)).toContain('oklch(1 0 0)');
+  });
+
+  it('stays hex in the design-tokens file, whose colour strings are hex', () => {
+    const tokens = emitW3cTokens(OKLCH);
+    expect(tokens).toContain('"#ffffff"');
+    expect(tokens).not.toContain('oklch');
+  });
+});

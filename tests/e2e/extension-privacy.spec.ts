@@ -12,7 +12,8 @@ test.describe('the shipped extension', () => {
     const manifest = await serviceWorker.evaluate(() => chrome.runtime.getManifest());
 
     expect(manifest.host_permissions ?? []).toEqual([]);
-    expect(manifest.permissions).toEqual(['activeTab', 'scripting']);
+    // `storage` holds the settings view's choices, locally; it reads no page.
+    expect(manifest.permissions).toEqual(['activeTab', 'scripting', 'storage']);
   });
 
   test('declares no static content scripts', async ({ serviceWorker }) => {

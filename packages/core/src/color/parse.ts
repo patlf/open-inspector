@@ -48,6 +48,8 @@ export interface Oklch {
 /** The four strings a colour row in the UI shows. */
 export interface ColorFormats {
   hex: string;
+  /** Hex with the alpha pair always written, even at full opacity. */
+  hexa: string;
   rgb: string;
   hsl: string;
   oklch: string;
@@ -628,6 +630,16 @@ export function toHex(color: Rgba): string {
   return isOpaque(color) ? base : `${base}${hexPair(color.a * 255)}`;
 }
 
+/**
+ * Serialize as `#rrggbbaa`, alpha pair and all.
+ *
+ * For code that wants one fixed width — eight digits, every time — rather
+ * than hex that grows a pair only when a colour happens to be translucent.
+ */
+export function toHexa(color: Rgba): string {
+  return `#${hexPair(color.r)}${hexPair(color.g)}${hexPair(color.b)}${hexPair(color.a * 255)}`;
+}
+
 /** Serialize the way DevTools does: `rgb(r, g, b)`, or `rgba(...)` with alpha. */
 export function formatRgb(color: Rgba): string {
   const r = Math.round(color.r);
@@ -654,10 +666,42 @@ export function formatOklch(color: Rgba): string {
 export function formatColor(color: Rgba): ColorFormats {
   return {
     hex: toHex(color),
+    hexa: toHexa(color),
     rgb: formatRgb(color),
     hsl: formatHsl(color),
     oklch: formatOklch(color),
   };
+}
+
+/** The notations a colour can be shown in, the user's choice first among equals. */
+export type ColorFormat = keyof ColorFormats;
+
+export const COLOR_FORMATS: readonly ColorFormat[] = ['oklch', 'hex', 'hexa', 'rgb', 'hsl'];
+
+/** One colour in one notation. */
+export function formatAs(color: Rgba, format: ColorFormat): string {
+  return formatColor(color)[format];
+}
+
+/**
+ * A colour function with no nested parentheses. Computed values only ever
+ * serialize colours this way — never as hex or names — and `color-mix()` and
+ * friends, which nest, are left as written rather than half-converted.
+ */
+const COLOR_FUNCTION = /\b(?:rgba?|hsla?|hwb|oklab|oklch|lab|lch|color)\([^()]*\)/gi;
+
+/**
+ * Rewrite every colour inside a CSS value into one notation.
+ *
+ * `2px solid rgb(255, 0, 0)` becomes `2px solid oklch(0.628 0.258 29.2)`.
+ * Anything that does not parse is left exactly as it was: a wide-gamut colour
+ * we cannot convert faithfully is better shown as written than approximated.
+ */
+export function reformatColors(value: string, format: ColorFormat): string {
+  return value.replace(COLOR_FUNCTION, (match) => {
+    const parsed = parseColor(match);
+    return parsed ? formatAs(parsed, format) : match;
+  });
 }
 
 /**

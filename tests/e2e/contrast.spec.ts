@@ -105,6 +105,11 @@ for (const scheme of ['light', 'dark'] as const) {
     // once the toggles for states the page never styles go disabled.
     await expect(panel.locator('.state-toggle').filter({ hasText: /^:focus$/ })).toBeDisabled();
 
+    // With the structure drawer open, so its rows — the selected one on its
+    // accent wash included — are held to the same standard.
+    await panel.locator('button[aria-label="Structure"]').click();
+    await expect(panel.locator('.node[aria-selected="true"]')).toBeVisible();
+
     const rows = (await page.evaluate(MEASURE)) as Array<{
       cls: string; sample: string; px: number; ratio: number; need: number; pass: boolean;
     }>;

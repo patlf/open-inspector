@@ -6,7 +6,7 @@
     <title>Privacy Policy — Open Inspector</title>
     <meta
       name="description"
-      content="Open Inspector collects nothing, stores nothing, and transmits nothing. No analytics, no telemetry, no account, no licence check, no server."
+      content="Open Inspector collects nothing and transmits nothing, and stores only your own settings, on your device. No analytics, no telemetry, no account, no licence check, no server."
     />
     <link rel="icon" href="../favicon.svg?v=2" type="image/svg+xml" />
     <link rel="alternate icon" href="../favicon-32.png?v=2" sizes="32x32" type="image/png" />
@@ -26,10 +26,11 @@
 
       <main class="prose">
         <h1>Privacy Policy</h1>
-        <p class="updated">Last updated: 25 August 2026</p>
+        <p class="updated">Last updated: 3 October 2026</p>
 
         <p class="big">
-          Open Inspector collects nothing, stores nothing, and transmits nothing. There is no
+          Open Inspector collects nothing and transmits nothing, and the only thing it stores is your
+          own settings, on your own device. There is no
           analytics, no telemetry, no crash reporting, no account, no licence check and no server.
           The extension contains no code capable of making a network request.
         </p>
@@ -43,10 +44,11 @@
 
         <h2>What data is stored</h2>
         <p>
-          <b>None.</b> The extension does not use <code>chrome.storage</code>,
-          <code>localStorage</code>, IndexedDB, cookies, or any other persistence. Everything it
-          reads about a page lives in memory for as long as the panel is open and is discarded when
-          you close it.
+          <b>Your settings, and nothing else.</b> The choices you make in the panel's settings view,
+          and where you last left the panel, are kept with <code>storage.local</code>, on this
+          device, and never synced to the browser vendor. Nothing about any page is stored. There is no <code>localStorage</code>,
+          IndexedDB or cookies, and everything the extension reads about a page lives in memory for
+          as long as the panel is open and is discarded when you close it.
         </p>
         <p>
           Any change you make to a page — an edited CSS value, a forced <code>:hover</code> state, a
@@ -69,6 +71,13 @@
               <td>
                 Injects the inspector into that tab. Without it, <code>activeTab</code> cannot be
                 used.
+              </td>
+            </tr>
+            <tr>
+              <th scope="row"><code>storage</code></th>
+              <td>
+                Keeps your settings on this device. It reads nothing from any page, and neither
+                browser shows a warning for it at install.
               </td>
             </tr>
           </tbody>

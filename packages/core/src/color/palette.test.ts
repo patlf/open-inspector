@@ -161,6 +161,7 @@ describe('buildPalette', () => {
 
     expect(entry?.formats).toEqual({
       hex: '#ff0000',
+      hexa: '#ff0000ff',
       rgb: 'rgb(255, 0, 0)',
       hsl: 'hsl(0, 100%, 50%)',
       oklch: 'oklch(0.628 0.258 29.2)',

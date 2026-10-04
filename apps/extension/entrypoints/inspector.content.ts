@@ -1,11 +1,19 @@
 import { defineContentScript } from 'wxt/sandbox';
 import { createInspectorSession } from '@open-inspector/ui';
+import { loadSettings, onSettingsChanged, saveSettings } from '../lib/settings.js';
+import { createDevtoolsBridge } from '../lib/devtools-bridge.js';
 import {
+  DEVTOOLS_ATTACH,
+  DEVTOOLS_SETUP,
+  BEAUTIFY,
+  HANDLERS,
+  MAX_BEAUTIFY_LENGTH,
   PING,
   RESIZE,
   SAVE,
   TOGGLE,
   isInspectorMessage,
+  type HandlersResponse,
   type ResizeResponse,
   type ToggleResponse,
 } from '../lib/messages.js';
@@ -61,11 +69,55 @@ export default defineContentScript({
   runAt: 'document_idle',
 
   main(ctx) {
+    // Firefox only: the DevTools tab. Chrome builds leave it out entirely.
+    const devtools = import.meta.env.FIREFOX ? createDevtoolsBridge(window) : null;
+
     const session = createInspectorSession({
+      ...(devtools
+        ? {
+            surface: devtools.surface,
+            setUpDevtools: () => void browser.runtime.sendMessage({ type: DEVTOOLS_SETUP }),
+          }
+        : {}),
+
       // Downloads have to be started from the page's own world; the worker
       // does it. See lib/messages.ts.
       save: (href, filename) => {
         void browser.runtime.sendMessage({ type: SAVE, href, filename });
+      },
+
+      // Kept in storage.local, which content scripts can write directly.
+      onSettingsChange: (settings) => {
+        void saveSettings(settings);
+      },
+
+      // Only the worker can run code in the page's own world, where the
+      // handlers a page's scripts attached are visible. See lib/messages.ts.
+      readPageHandlers: async (eventName) => {
+        try {
+          const response = (await withTimeout(
+            browser.runtime.sendMessage({ type: HANDLERS, eventName }),
+            4000,
+          )) as HandlersResponse | undefined;
+          return response?.ok === true;
+        } catch {
+          return false;
+        }
+      },
+
+      // The worker carries the formatter, so this bundle does not. Code the
+      // worker would refuse, or a worker that does not answer, leaves it as written.
+      beautify: async (code) => {
+        if (code.length > MAX_BEAUTIFY_LENGTH) return code;
+        try {
+          const formatted: unknown = await withTimeout(
+            browser.runtime.sendMessage({ type: BEAUTIFY, code }),
+            4000,
+          );
+          return typeof formatted === 'string' ? formatted : code;
+        } catch {
+          return code;
+        }
       },
 
       // Only the worker can move a window; a content script has no windows API.
@@ -91,10 +143,21 @@ export default defineContentScript({
           return Promise.resolve({ active: session.active });
         case TOGGLE:
           return Promise.resolve({ active: session.toggle() });
+        case DEVTOOLS_ATTACH:
+          devtools?.attach(session, message.activate);
+          return undefined;
       }
     };
 
     browser.runtime.onMessage.addListener(handleMessage);
+
+    /**
+     * Settings arrive after the session exists, from an asynchronous read.
+     * The panel only appears once a toggle message lands, which is well after
+     * this resolves, so nothing is drawn in the wrong colour notation first.
+     */
+    void loadSettings().then((settings) => session.updateSettings(settings));
+    const stopListening = onSettingsChanged((settings) => session.updateSettings(settings));
 
     /**
      * Tear down completely when this instance is superseded.
@@ -115,6 +178,8 @@ export default defineContentScript({
      */
     ctx.onInvalidated(() => {
       browser.runtime.onMessage.removeListener(handleMessage);
+      stopListening();
+      devtools?.destroy();
       session.destroy();
     });
   },

@@ -13,7 +13,7 @@ import { PLAYGROUND, openInspector, openTab, panel, pin } from './support/panel.
  */
 
 const KEYBOARD_URL = `${PLAYGROUND}/keyboard.html`;
-const TABS = ['styles', 'color', 'type', 'layout', 'assets', 'markup', 'export'] as const;
+const TABS = ['styles', 'color', 'type', 'layout', 'assets', 'markup', 'js', 'export', 'svg'] as const;
 
 interface Finding {
   surface: string;
@@ -55,6 +55,10 @@ async function auditEverySurface(page: Page): Promise<Finding[]> {
   await panel(page).getByRole('button', { name: 'Keyboard shortcuts' }).click();
   await expect(panel(page).locator('.head .onboard-keys')).toBeVisible();
   findings.push(...(await auditPanel(page, 'shortcuts open')));
+
+  await panel(page).getByRole('button', { name: 'Structure' }).click();
+  await expect(panel(page).getByRole('tree')).toBeVisible();
+  findings.push(...(await auditPanel(page, 'structure open')));
   return findings;
 }
 
@@ -192,12 +196,13 @@ test.describe('keyboard only', () => {
     await expect(color).toBeFocused();
     await expect(styles).toHaveAttribute('tabindex', '-1');
 
+    // SVG is the last tab on the rail.
     await page.keyboard.press('End');
-    await expect(panel(page).locator('#oi-tab-export')).toBeFocused();
+    await expect(panel(page).locator('#oi-tab-svg')).toBeFocused();
     await page.keyboard.press('ArrowRight'); // wraps
     await expect(styles).toBeFocused();
     await page.keyboard.press('ArrowLeft'); // wraps back
-    await expect(panel(page).locator('#oi-tab-export')).toHaveAttribute('aria-selected', 'true');
+    await expect(panel(page).locator('#oi-tab-svg')).toHaveAttribute('aria-selected', 'true');
     await page.keyboard.press('Home');
     await expect(styles).toHaveAttribute('aria-selected', 'true');
 
@@ -253,5 +258,23 @@ test.describe('keyboard only', () => {
     // 3: nothing pending, so no confirmation — it just closes.
     await page.keyboard.press('Escape');
     await expect(panel(page)).toHaveCount(0);
+  });
+
+  test('Escape in the filter box clears it and nothing else', async ({ context, serviceWorker }) => {
+    const page = await context.newPage();
+    await openInspector(page, serviceWorker, KEYBOARD_URL);
+    await pin(page, '#c2');
+    const label = panel(page).locator('.selector');
+    await expect(label).toContainText('c2');
+
+    const filter = panel(page).locator('.search');
+    await filter.fill('padding');
+    await filter.press('Escape');
+    await expect(filter).toHaveValue('');
+
+    // Still pinned: moving the pointer away does not change what is shown.
+    const c3 = await page.locator('#c3').boundingBox();
+    await page.mouse.move(c3!.x + 10, c3!.y + 10);
+    await expect(label).toContainText('c2');
   });
 });

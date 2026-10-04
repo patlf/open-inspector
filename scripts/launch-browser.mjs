@@ -59,8 +59,9 @@ if (!existsSync(join(EXTENSION, 'manifest.json'))) {
  */
 {
   const manifest = JSON.parse(readFileSync(join(EXTENSION, 'manifest.json'), 'utf8'));
+  const shipped = new Set(['activeTab', 'scripting', 'storage']);
   const extraPermissions = (manifest.permissions ?? []).filter(
-    (permission) => permission !== 'activeTab' && permission !== 'scripting',
+    (permission) => !shipped.has(permission),
   );
 
   if (manifest.host_permissions?.length || extraPermissions.length > 0) {

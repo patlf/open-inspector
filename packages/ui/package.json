@@ -18,6 +18,10 @@
   },
   "dependencies": {
     "@open-inspector/core": "workspace:*",
-    "preact": "^10.29.8"
+    "preact": "^10.29.8",
+    "prismjs": "^1.30.0"
+  },
+  "devDependencies": {
+    "@types/prismjs": "^1.26.6"
   }
 }

@@ -154,7 +154,7 @@ test.describe('copying', () => {
       const shown = await panel(page).locator('#oi-tabpanel pre').textContent();
       expect(shown?.trim(), `${label} should not be empty`).toBeTruthy();
 
-      const copy = panel(page).getByRole('button', { name: 'copy all' });
+      const copy = panel(page).locator('#oi-tabpanel .code-block .copy');
       expect(await copyVia(page, copy)).toBe(shown);
 
       if (label === 'JSON' || label === 'W3C tokens') expect(() => JSON.parse(shown!)).not.toThrow();
@@ -183,17 +183,17 @@ test.describe('copying', () => {
    * world even when the copy happened, so the button used to never confirm.
    * It now trusts the textarea's `copy` event instead.
    */
-  test('a copy button confirms with "copied"', async ({ context, serviceWorker }) => {
+  test('a copy button confirms with "Copied"', async ({ context, serviceWorker }) => {
     const page = await context.newPage();
     await openInspector(page, serviceWorker, EGRESS_URL);
     await pin(page, '#hover-target');
     await openTab(page, 'assets');
 
-    // By its title, which stays put: the accessible name changes to "copied",
-    // which a `name: 'copy'` locator would stop matching.
-    const copy = assetRow(page, 'loaded.svg').locator('button[title^="Copy "]').first();
+    // By its copied state, which stays put: the accessible name changes to
+    // "Copied", which a `name: 'Copy'` locator would stop matching.
+    const copy = assetRow(page, 'loaded.svg').locator('.copy-icon[data-copied]');
     await copy.click();
-    await expect(copy).toHaveText('copied');
+    await expect(copy).toHaveText('Copied');
     await expect(copy).toHaveAttribute('data-copied', 'true');
   });
 });

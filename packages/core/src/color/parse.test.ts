@@ -3,6 +3,7 @@ import type { Rgba } from './parse.js';
 import {
   TRANSPARENT,
   compositeOver,
+  formatAs,
   formatColor,
   formatHsl,
   formatOklch,
@@ -12,6 +13,7 @@ import {
   oklabToRgba,
   oklchToRgba,
   parseColor,
+  reformatColors,
   toHex,
   toHsl,
   toOklab,
@@ -347,10 +349,48 @@ describe('formatting', () => {
   it('bundles every form the UI shows', () => {
     expect(formatColor(RED)).toEqual({
       hex: '#ff0000',
+      hexa: '#ff0000ff',
       rgb: 'rgb(255, 0, 0)',
       hsl: 'hsl(0, 100%, 50%)',
       oklch: 'oklch(0.628 0.258 29.2)',
     });
+  });
+});
+
+describe('formatAs', () => {
+  it('picks one notation', () => {
+    expect(formatAs(RED, 'oklch')).toBe('oklch(0.628 0.258 29.2)');
+    expect(formatAs(RED, 'hex')).toBe('#ff0000');
+  });
+
+  it('writes hexa at eight digits whatever the alpha', () => {
+    expect(formatAs(RED, 'hexa')).toBe('#ff0000ff');
+    expect(formatAs({ ...RED, a: 0.5 }, 'hexa')).toBe('#ff000080');
+  });
+});
+
+describe('reformatColors', () => {
+  it('rewrites the colour inside a shorthand and leaves the rest', () => {
+    expect(reformatColors('2px solid rgb(255, 0, 0)', 'hex')).toBe('2px solid #ff0000');
+    expect(reformatColors('2px solid rgb(255, 0, 0)', 'oklch')).toBe(
+      '2px solid oklch(0.628 0.258 29.2)',
+    );
+  });
+
+  it('converts every colour in a list, alpha included', () => {
+    expect(
+      reformatColors('rgba(0, 0, 0, 0.5) 0px 1px 2px, rgb(255, 255, 255) 0px 0px 0px', 'hex'),
+    ).toBe('#00000080 0px 1px 2px, #ffffff 0px 0px 0px');
+  });
+
+  it('reads the modern spaces Chrome serializes into', () => {
+    expect(reformatColors('oklch(0.628 0.258 29.2)', 'rgb')).toBe('rgb(255, 0, 0)');
+  });
+
+  it('leaves values without colours, and nested colour maths, untouched', () => {
+    expect(reformatColors('16px 8px', 'oklch')).toBe('16px 8px');
+    const mixed = 'color-mix(in srgb, red 50%, blue)';
+    expect(reformatColors(mixed, 'hex')).toBe(mixed);
   });
 });
 

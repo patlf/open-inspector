@@ -66,7 +66,7 @@ for (const [name, t] of Object.entries(THEMES)) {
   <div class="left">
     <div class="brand"><img src="data:image/svg+xml;base64,${logo}" alt="">Open Inspector</div>
     <h1>Inspect any page.<br><em>No site access requested.</em></h1>
-    <p>Layout, styles, colour, type, assets and design tokens — from an extension that asks for nothing and sends nothing.</p>
+    <p>Layout, styles, color, type, assets and design tokens — from an extension that asks for nothing and sends nothing.</p>
     <div class="chips">
       <span class="chip good">0 host permissions</span>
       <span class="chip good">0 network requests</span>

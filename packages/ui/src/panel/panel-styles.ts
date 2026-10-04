@@ -1,11 +1,56 @@
 /**
+ * The light theme's tokens, written once for the two places that use them:
+ * the system's light preference, and light chosen in settings.
+ */
+const LIGHT_PANEL = `
+      --bg: #ffffff;
+      --bg-raised: #f4f6f7;
+      --bg-sunk: #eaedef;
+      --ink: #14181c;
+      --ink-soft: #3d474e;
+      /* Tuned against --bg-sunk, the darkest light surface: 5.06:1 there. */
+      --ink-mute: #5c656b;
+      --grip-shade: rgba(20, 24, 28, 0.45);
+      --grip-light: #ffffff;
+      --rule: #d5dbde;
+      /* 3.5:1 on sunk, clearing the 3:1 that WCAG 1.4.11 asks of a boundary. */
+      --rule-strong: #787d80;
+      /*
+       * White reads on the light accent (5.37:1) but only 3.06:1 on the dark
+       * one, which is why the most prominent control in the panel — the
+       * Inspect button — was the least legible thing in it after dark. The
+       * dark theme puts near-black on the orange instead, at 5.83:1.
+       */
+      --on-accent: #ffffff;
+      --accent: #b8451f;
+      --accent-wash: rgba(184, 69, 31, 0.10);
+      /* Both clear 4.5:1 on sunk, where the copied state and notes sit. */
+      --good: #376f4e;
+      --warn: #86591a;
+      --risk: #a8352b;
+      --bd-margin: #fbe3cc;
+      --bd-border: #fcf1c6;
+      --bd-padding: #dbebd4;
+      --bd-content: #cfe1ec;
+      --bd-ink: #14181c;
+      --bd-zero: #50555b;
+      --syn-keyword: #1c58b8;
+      --syn-name: #0b6a62;
+      --syn-string: #2f6a30;
+      --syn-number: #8a5200;
+      --syn-selector: #6a3fbf;
+      box-shadow: 0 16px 48px -18px rgba(20, 24, 28, 0.4), 0 1px 3px rgba(20, 24, 28, 0.16);
+`;
+
+/**
  * Styles for the panel's shadow tree.
  *
  * The panel floats over pages we do not control, so it commits to its own
  * visual world rather than trying to blend in: a compact instrument, dark by
  * default because that is the convention for developer tools and because a
  * light panel glares over most sites. It follows the viewer's colour-scheme
- * preference, since designers frequently work in light.
+ * preference, since designers frequently work in light, unless settings
+ * choose one or the other.
  *
  * Everything is scoped by the shadow boundary, so class names can be short and
  * no selector needs defensive specificity.
@@ -13,9 +58,19 @@
 export const PANEL_STYLES = `
   :host {
     all: initial;
+    /*
+     * The panel's one curve, for everything that enters, leaves or answers a
+     * press: a strong ease-out, which moves at once and settles, so a short
+     * transition still reads as immediate. Color fades use plain ease.
+     */
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   }
 
-  * { box-sizing: border-box; }
+  /*
+   * Thin scrollbars everywhere in the panel: not inherited, so it goes on
+   * every element. Their colour is inherited, and set once on .panel.
+   */
+  * { box-sizing: border-box; scrollbar-width: thin; }
 
   .panel {
     --bg: #14181c;
@@ -42,6 +97,15 @@ export const PANEL_STYLES = `
      * reach 3:1 because the boundary is what tells you the control is there.
      */
     --rule-strong: #656b70;
+    /*
+     * A thumb and no track. The panel scrolls in several places at once — the
+     * body, the tree, code blocks — and a full track on each drew more lines
+     * than the content did. Mixed from --ink-mute so it follows the theme.
+     */
+    --scroll-thumb: color-mix(in srgb, var(--ink-mute) 55%, transparent);
+    /* The corner grip's pressed-in pixels: a shadow, and the light that catches its lower edge. */
+    --grip-shade: rgba(0, 0, 0, 0.75);
+    --grip-light: rgba(255, 255, 255, 0.22);
     /* Text on an accent fill. See the note in the light block. */
     --on-accent: #14181c;
     --accent: #e4743f;
@@ -66,6 +130,16 @@ export const PANEL_STYLES = `
     --bd-content: #294453;
     --bd-ink: #e6eaec;
     --bd-zero: #b3bcc2;
+    /*
+     * Syntax colors for the code blocks. Each clears 7.8:1 on every surface
+     * code sits on here, and 5.4:1 in the light block; comments and
+     * punctuation take --ink-mute, already held to AA.
+     */
+    --syn-keyword: #79b8ff;
+    --syn-name: #5fd0c4;
+    --syn-string: #9fcf7f;
+    --syn-number: #e3b46a;
+    --syn-selector: #c3a6ff;
 
     position: fixed;
     top: 12px;
@@ -85,44 +159,41 @@ export const PANEL_STYLES = `
     line-height: 1.5;
     pointer-events: auto;
     overflow: hidden;
+    scrollbar-color: var(--scroll-thumb) transparent;
   }
 
+  /*
+   * Light: the system's when the panel follows it, or chosen in settings.
+   * A chosen dark keeps the dark tokens above whatever the system says.
+   */
   @media (prefers-color-scheme: light) {
-    .panel {
-      --bg: #ffffff;
-      --bg-raised: #f4f6f7;
-      --bg-sunk: #eaedef;
-      --ink: #14181c;
-      --ink-soft: #3d474e;
-      /* Tuned against --bg-sunk, the darkest light surface: 5.06:1 there. */
-      --ink-mute: #5c656b;
-      --rule: #d5dbde;
-      /* 3.5:1 on sunk, clearing the 3:1 that WCAG 1.4.11 asks of a boundary. */
-      --rule-strong: #787d80;
-      /*
-       * White reads on the light accent (5.37:1) but only 3.06:1 on the dark
-       * one, which is why the most prominent control in the panel — the
-       * Inspect button — was the least legible thing in it after dark. The
-       * dark theme puts near-black on the orange instead, at 5.83:1.
-       */
-      --on-accent: #ffffff;
-      --accent: #b8451f;
-      --accent-wash: rgba(184, 69, 31, 0.10);
-      /* Both clear 4.5:1 on sunk, where the copied state and notes sit. */
-      --good: #376f4e;
-      --warn: #86591a;
-      --risk: #a8352b;
-      --bd-margin: #fbe3cc;
-      --bd-border: #fcf1c6;
-      --bd-padding: #dbebd4;
-      --bd-content: #cfe1ec;
-      --bd-ink: #14181c;
-      --bd-zero: #50555b;
-      box-shadow: 0 16px 48px -18px rgba(20, 24, 28, 0.4), 0 1px 3px rgba(20, 24, 28, 0.16);
-    }
+    .panel:not([data-theme='dark']) {
+${LIGHT_PANEL}    }
   }
+  .panel[data-theme='light'] {
+${LIGHT_PANEL}  }
 
   .panel[data-side='left'] { right: auto; left: 12px; }
+  /*
+   * Floating where it was dropped: its top-left corner comes inline, and it
+   * still runs down to the bottom margin, so the body keeps all the height
+   * there is below it.
+   */
+  .panel[data-side='float'] { right: auto; bottom: 12px; }
+  .panel[data-dragging='true'] { user-select: none; }
+  /*
+   * A DevTools tab: the panel is the whole document, so it fills it, square
+   * and flat, with no floating frame around it.
+   */
+  .panel[data-side='embedded'] {
+    position: fixed;
+    inset: 0;
+    width: auto;
+    max-width: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
 
   /* Everything but the rail: header, the tab's content, the footer. */
   .main {
@@ -177,11 +248,16 @@ export const PANEL_STYLES = `
   .panel-tab:hover { filter: brightness(1.08); }
 
   @media (prefers-color-scheme: light) {
-    .panel-tab {
+    .panel-tab:not([data-theme='dark']) {
       background: #b8451f;
       border-color: #b8451f;
       color: #ffffff;
     }
+  }
+  .panel-tab[data-theme='light'] {
+    background: #b8451f;
+    border-color: #b8451f;
+    color: #ffffff;
   }
 
   /* ---------- toolbar ---------- */
@@ -230,7 +306,8 @@ export const PANEL_STYLES = `
   }
   .search-box:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
 
-  .search {
+  .search,
+  .tree-search {
     flex: 1;
     min-width: 0;
     height: 100%;
@@ -242,8 +319,10 @@ export const PANEL_STYLES = `
     font-family: var(--sans);
     font-size: 11.5px;
   }
-  .search::placeholder { color: var(--ink-mute); }
-  .search::-webkit-search-cancel-button { filter: grayscale(1) opacity(0.6); }
+  .search::placeholder,
+  .tree-search::placeholder { color: var(--ink-mute); }
+  .search::-webkit-search-cancel-button,
+  .tree-search::-webkit-search-cancel-button { filter: grayscale(1) opacity(0.6); }
 
   /*
    * Presets, not a free-form number box. The widths that matter are few and
@@ -484,7 +563,8 @@ export const PANEL_STYLES = `
     cursor: ew-resize;
     touch-action: none;
   }
-  .panel[data-side='left'] .resize-handle { left: auto; right: 0; }
+  .panel[data-side='left'] .resize-handle,
+  .panel[data-side='float'] .resize-handle { left: auto; right: 0; }
   .resize-handle::after {
     content: '';
     position: absolute;
@@ -493,16 +573,64 @@ export const PANEL_STYLES = `
     left: 0;
     width: 2px;
     background: transparent;
-    transition: background 120ms ease-out;
+    transition: background 120ms ease;
   }
-  .panel[data-side='left'] .resize-handle::after { left: auto; right: 0; }
+  .panel[data-side='left'] .resize-handle::after,
+  .panel[data-side='float'] .resize-handle::after { left: auto; right: 0; }
   .resize-handle:hover::after,
   .resize-handle:focus-visible::after,
   .resize-handle[data-dragging='true']::after { background: var(--accent); }
   .resize-handle:focus-visible { outline: none; }
-  @media (prefers-reduced-motion: reduce) {
-    .resize-handle::after { transition: none; }
+
+  /* The bottom edge: the same thin line as the side, turned on its side. */
+  .resize-bottom {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 6px;
+    z-index: 3;
+    cursor: ns-resize;
+    touch-action: none;
   }
+  .resize-bottom::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 2px;
+    background: transparent;
+    transition: background 120ms ease;
+  }
+  .resize-bottom:hover::after,
+  .resize-bottom:focus-visible::after,
+  .resize-bottom[data-dragging='true']::after { background: var(--accent); }
+  .resize-bottom:focus-visible { outline: none; }
+
+  /*
+   * The bottom-right corner, above both edges so a press there takes width and
+   * height together. A grip of three inset pixels marks it.
+   */
+  .resize-corner {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 14px;
+    height: 14px;
+    z-index: 4;
+    cursor: nwse-resize;
+    touch-action: none;
+  }
+  .corner-grip {
+    position: absolute;
+    right: 3px;
+    bottom: 3px;
+    display: block;
+    shape-rendering: crispEdges;
+  }
+  .grip-shade { fill: var(--grip-shade); }
+  .grip-light { fill: var(--grip-light); }
 
   button {
     font: inherit;
@@ -512,6 +640,17 @@ export const PANEL_STYLES = `
     border-radius: 5px;
     cursor: pointer;
     padding: 3px 6px;
+    transition: scale 160ms var(--ease-out);
+  }
+
+  /*
+   * A press gives a little under the pointer, so a click is felt before its
+   * result lands. The scale property rather than transform, so it composes
+   * with the buttons a transform positions. Pointer presses only — a key
+   * press does not set :hover, and keyboard actions should not animate.
+   */
+  @media (prefers-reduced-motion: no-preference) {
+    button:not(:disabled):active:hover { scale: 0.97; }
   }
 
   button:hover { background: var(--bg-sunk); }
@@ -567,19 +706,25 @@ export const PANEL_STYLES = `
     border-left: 1px solid color-mix(in srgb, currentColor 40%, transparent);
   }
 
-  /* Held: the picker is paused, so drop to an outline. */
+  /*
+   * Off: the picker is paused. A toggle like the forced states, so it reads
+   * the same way they do — neutral while off, solid accent while on.
+   */
   .primary-btn[aria-pressed='false'] {
-    background: transparent;
-    color: var(--accent);
+    background: var(--bg-sunk);
+    border-color: transparent;
+    color: var(--ink-soft);
   }
-  .primary-btn[aria-pressed='false']:hover { background: var(--accent-wash); }
-  .primary-btn[aria-pressed='false'] .state { border-left-color: var(--accent); }
+  .primary-btn[aria-pressed='false']:hover {
+    filter: none;
+    background: var(--bg-sunk);
+    color: var(--ink);
+  }
 
   /*
-   * Once an element is held: the same button as an icon. Filled while picking,
-   * because the page cannot be clicked then and that must be obvious; outlined
-   * in the accent while paused, so it still reads as the thing to press next
-   * rather than as one more grey icon in a row of them.
+   * Once an element is held: the same button as an icon, solid while
+   * picking, because the page cannot be clicked then and that must be
+   * obvious.
    */
   .primary-btn[data-compact='true'] {
     /* .primary-btn comes later than .icon-btn and is inline-flex, which left
@@ -589,13 +734,12 @@ export const PANEL_STYLES = `
     padding: 0;
     font-weight: 400;
   }
-  .primary-btn[data-compact='true'][aria-pressed='false'] {
-    border: 1px solid var(--accent);
-    color: var(--accent);
-    background: transparent;
+  /* Outranks .icon-btn[aria-pressed='true'], whose wash would otherwise win. */
+  .primary-btn[data-compact='true'][aria-pressed='true'] {
+    color: var(--on-accent);
+    background: var(--accent);
+    border-color: var(--accent);
   }
-  .primary-btn[data-compact='true'][aria-pressed='false']:hover { background: var(--accent-wash); }
-  .primary-btn[data-compact='true'][aria-pressed='true']:hover { color: var(--on-accent); }
 
   /* ---------- editing ---------- */
 
@@ -985,6 +1129,155 @@ export const PANEL_STYLES = `
     font-variant-numeric: tabular-nums;
   }
 
+  /* The drawer toggle is a step button that stays lit while the tree is open. */
+  .step[aria-pressed='true'] { color: var(--accent); background: var(--accent-wash); }
+
+  /* ---------- structure drawer ---------- */
+
+  /*
+   * A fixed share of the panel with its own scroll, so a deep tree never
+   * pushes the tab content off screen. The bottom edge can be dragged: some
+   * pages want a tall tree, most want their styles.
+   */
+  .structure {
+    position: relative;
+    height: 220px;
+    min-height: 96px;
+    max-height: 70vh;
+    resize: vertical;
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: 3px 0;
+    background: var(--bg-sunk);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.65;
+  }
+
+  /* Rows grow to their content and scroll sideways, as deep trees need. */
+  .node {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    width: max-content;
+    min-width: 100%;
+    padding-right: 10px;
+    white-space: nowrap;
+    color: var(--ink-soft);
+    cursor: default;
+  }
+  .node:hover { background: var(--bg-raised); }
+  .node:focus { outline: none; }
+  .node:focus-visible { box-shadow: inset 0 0 0 1px var(--accent); }
+  /* Ink on the wash: the selected row must stay as legible as any other. */
+  .node[aria-selected='true'] { background: var(--accent-wash); color: var(--ink); }
+  .node[aria-selected='true'] .node-attrs,
+  .node[aria-selected='true'] .node-text { color: var(--ink); }
+
+  .node-twisty {
+    flex: none;
+    display: inline-grid;
+    place-items: center;
+    width: 14px;
+    height: 14px;
+    color: var(--ink-mute);
+  }
+  /*
+   * Turns at once. The tree is walked with the arrow keys as often as with
+   * the pointer, and its rows appear without easing; a twisty still turning
+   * after its children have arrived only reads as lag.
+   */
+  .node-twisty[data-open='true'] .icon { transform: rotate(90deg); }
+
+  .node-tag { color: var(--ink); }
+  .node-attrs { color: var(--ink-mute); }
+  .node[data-kind='shadow-root'] .node-tag { color: var(--ink-soft); font-style: italic; }
+  .node-text { margin-left: 6px; color: var(--ink-mute); font-family: var(--sans); }
+  .node-text::before { content: '“'; }
+  .node-text::after { content: '”'; }
+  .node-address { margin-left: 6px; color: var(--ink-soft); }
+  .node-file { margin-left: 6px; color: var(--ink-soft); }
+  .node-file[data-inline='true'] { color: var(--ink-mute); font-style: italic; }
+  .node-more { color: var(--ink-soft); text-decoration: underline; text-underline-offset: 2px; }
+  /*
+   * The JavaScript logo as a prefix to the tag, so a row with handlers is
+   * found at a glance. Placed there by order, not written there: in the
+   * markup it follows the tag, so a screen reader names the element before
+   * the mark.
+   *
+   * Grey, like the JS filter while it is off: a mark on many rows should
+   * not outshout the tags it sits beside. Its letters are cut out of the
+   * square, so the row's own background draws them, in either theme.
+   */
+  .node-twisty { order: -2; }
+  .node-js {
+    order: -1;
+    flex: none;
+    display: grid;
+    margin-right: 4px;
+    color: var(--ink-mute);
+    cursor: pointer;
+  }
+  .node-js:hover { color: var(--ink); }
+
+  /*
+   * Above the tree and outside its scroll, so the controls stay put while it
+   * moves, and stacked over it so the labels they drop below are not covered.
+   */
+  .structure-bar {
+    position: relative;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-bottom: 4px;
+  }
+  .structure-bar button { position: relative; }
+  .structure-bar .tab-label {
+    --label-shift: translateY(0);
+    left: 0;
+    top: calc(100% + 6px);
+    transform-origin: top left;
+  }
+  /*
+   * The bar's buttons answer the pointer as the Hide toggle does: a filled
+   * pill, the ink brightening. At rest the JS filter is the badge alone —
+   * grey while off, the accent while on, like every other toggle in the
+   * panel — and its box shows only under the pointer.
+   */
+  .structure-bar .icon-btn,
+  .structure-bar .js-toggle {
+    display: inline-grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--ink-mute);
+  }
+  .structure-bar .icon-btn:hover,
+  .structure-bar .js-toggle:hover { background: var(--bg-sunk); color: var(--ink); }
+  .structure-bar .js-toggle[aria-pressed='true'] { color: var(--accent); }
+  .structure-count {
+    margin-left: auto;
+    padding-left: 6px;
+    white-space: nowrap;
+    font-size: 10.5px;
+    color: var(--ink-mute);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .structure-note {
+    margin: 4px 8px;
+    font-family: var(--sans);
+    font-size: 11px;
+    color: var(--warn);
+  }
+
   /* ---------- rail ---------- */
 
   /*
@@ -999,10 +1292,14 @@ export const PANEL_STYLES = `
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 8px 0;
+    /* As far from the top and bottom as from the sides: (39 - 30) / 2. */
+    padding: 4.5px 0;
     background: var(--bg-raised);
     border-right: 1px solid var(--rule);
   }
+  /* Its empty space is the panel's handle; the buttons on it stay buttons. */
+  .panel:not([data-side='embedded']) .rail { cursor: grab; touch-action: none; }
+  .panel[data-dragging='true'] .rail { cursor: grabbing; }
 
   .tabs { display: flex; flex-direction: column; gap: 3px; }
 
@@ -1031,10 +1328,14 @@ export const PANEL_STYLES = `
    * second to appear and never appears for keyboard users at all.
    */
   .tab-label {
+    /* Where the label sits against its button; the tree's bar puts it below. */
+    --label-shift: translateY(-50%);
     position: absolute;
     left: calc(100% + 8px);
     top: 50%;
-    transform: translateY(-50%);
+    /* Grows out of the button it names, not from its own middle. */
+    transform-origin: left center;
+    transform: var(--label-shift) scale(0.97);
     padding: 3px 7px;
     border-radius: 5px;
     background: var(--ink);
@@ -1045,12 +1346,44 @@ export const PANEL_STYLES = `
     white-space: nowrap;
     pointer-events: none;
     opacity: 0;
-    transition: opacity 100ms ease-out;
+    /*
+     * Timing comes from the button, so hovering can slow the way in without
+     * slowing the way out: a label leaves in 100ms, straight away.
+     */
+    transition:
+      opacity var(--label-duration, 100ms) var(--ease-out) var(--label-delay, 0s),
+      transform var(--label-duration, 100ms) var(--ease-out) var(--label-delay, 0s);
   }
-  .tab:hover .tab-label,
-  .tab:focus-visible .tab-label { opacity: 1; transition-delay: 150ms; }
+  .tab:focus-visible .tab-label,
+  .rail-foot .icon-btn:focus-visible .tab-label,
+  .structure-bar button:focus-visible .tab-label,
+  .copy-icon:focus-visible .tab-label { opacity: 1; transform: var(--label-shift); }
+  /*
+   * A short wait before the first label, so sweeping the pointer across the
+   * rail does not flash every name on the way. Only where hover is real: a
+   * tap would leave the label stuck on.
+   */
+  @media (hover: hover) and (pointer: fine) {
+    .tab:hover,
+    .rail-foot .icon-btn:hover,
+    .structure-bar button:hover,
+    .copy-icon:hover { --label-duration: 150ms; --label-delay: 150ms; }
+    .tab:hover .tab-label,
+    .rail-foot .icon-btn:hover .tab-label,
+    .structure-bar button:hover .tab-label,
+    .copy-icon:hover .tab-label { opacity: 1; transform: var(--label-shift); }
+  }
+  /*
+   * At once: from the keyboard, which should never wait on an animation, and
+   * once one label is up (Rail marks the rail warm), since by then the
+   * pointer is plainly reading the names.
+   */
+  .rail:has(:focus-visible) .tab-label,
+  .rail[data-warm='true'] .tab-label,
+  .structure-bar:has(:focus-visible) .tab-label { transition: none; }
+  /* Without motion the label still fades, but does not grow. */
   @media (prefers-reduced-motion: reduce) {
-    .tab-label { transition: none; }
+    .tab-label { transform: var(--label-shift); }
   }
 
   .rail-foot {
@@ -1060,7 +1393,8 @@ export const PANEL_STYLES = `
     align-items: center;
     gap: 2px;
   }
-  .rail-foot .icon-btn { width: 30px; height: 30px; border-radius: 7px; }
+  /* Labelled the same way as the tabs above them, so it is positioned too. */
+  .rail-foot .icon-btn { position: relative; width: 30px; height: 30px; border-radius: 7px; }
 
   /* ---------- body ---------- */
 
@@ -1072,13 +1406,6 @@ export const PANEL_STYLES = `
     display: flex;
     flex-direction: column;
     gap: 12px;
-  }
-
-  .body::-webkit-scrollbar { width: 10px; }
-  .body::-webkit-scrollbar-thumb {
-    background: var(--rule);
-    border-radius: 5px;
-    border: 3px solid var(--bg);
   }
 
   .group { display: flex; flex-direction: column; gap: 4px; }
@@ -1203,11 +1530,16 @@ export const PANEL_STYLES = `
     overflow-wrap: anywhere;
   }
 
+  /* A hairline at rest so it reads as a button rather than a stray word. */
   .copy {
     font-size: 10.5px;
     color: var(--ink-mute);
     padding: 1px 4px;
+    border-radius: 6px;
+    border-color: var(--rule);
   }
+  /* Answers the pointer as the Hide toggle does, filled with the ink brightening, and firms its edge as Scan the page does. */
+  .copy:hover { color: var(--ink); background: var(--bg-sunk); border-color: var(--rule-strong); }
 
   /*
    * Hover-to-reveal belongs to dense value rows and nowhere else.
@@ -1223,6 +1555,35 @@ export const PANEL_STYLES = `
     .row .copy, .asset .copy { opacity: 1; }
   }
   .copy[data-copied='true'] { color: var(--good); opacity: 1; }
+
+  /*
+   * The clipboard form. Its label rises above it rather than out to the
+   * side: in a row it would cover the value it copies, and below it a later
+   * row, painted after, would cover the label. It lines up with the button's
+   * right edge, since these buttons sit at the right of what they belong to:
+   * centred, it reached past the panel's edge, and even hidden it counted
+   * toward the width the body scrolls.
+   */
+  .copy-icon { position: relative; }
+  /*
+   * Square, and as tall as a text button beside it: that one is a line of
+   * its text (1.5em) plus 1px of padding and 1px of border on each side.
+   */
+  .copy.copy-icon {
+    display: inline-grid;
+    place-items: center;
+    width: calc(1.5em + 4px);
+    height: calc(1.5em + 4px);
+    padding: 0;
+  }
+  .copy-icon .tab-label {
+    --label-shift: none;
+    left: auto;
+    right: 0;
+    top: auto;
+    bottom: calc(100% + 6px);
+    transform-origin: bottom right;
+  }
 
   /* ---------- footer ---------- */
 
@@ -1260,6 +1621,8 @@ export const PANEL_STYLES = `
     background: var(--bg-sunk);
     padding: 4px 10px;
     border-radius: 6px;
+    /* The same faint edge as the copy buttons, firmed up on hover below. */
+    border-color: var(--rule);
   }
   .sample-btn:hover { border-color: var(--rule-strong); }
 
@@ -1400,16 +1763,236 @@ export const PANEL_STYLES = `
   .badge.fail { color: var(--risk); background: color-mix(in srgb, var(--risk) 12%, transparent); }
   .badge.unknown { color: var(--warn); background: color-mix(in srgb, var(--warn) 13%, transparent); }
 
-  .meter {
-    height: 4px;
+  /* ---------- js ---------- */
+
+  .js-list { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+  .js-item { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .js-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+  .js-event { font-family: var(--mono); font-size: 11px; color: var(--ink); }
+  .js-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--ink-soft);
+  }
+  .js-detail { font-family: var(--mono); font-size: 10px; color: var(--ink-mute); }
+  .js-tag {
+    padding: 1px 5px;
+    border-radius: 4px;
     background: var(--bg-sunk);
-    border-radius: 2px;
+    color: var(--ink-soft);
+    font-size: 10px;
+  }
+  .js-actions { margin-left: auto; display: flex; gap: 2px; }
+  /* A handler is usually a line or two; a code block's panel-filling height is for files. */
+  .js-source { flex: none; min-height: 0; max-height: 180px; }
+  /*
+   * An open script is a file: it takes what the tab has left, the way
+   * Markup's code does, through each box between it and the body. Never
+   * less than its content, so a long list still scrolls as a list.
+   */
+  .body > .group:has(.js-more[open]),
+  .group:has(.js-more[open]) > .js-list,
+  .js-item:has(> .js-more[open]),
+  .js-more[open] { flex: 1 0 auto; }
+  /*
+   * A details element keeps its content in a box of its own, past the
+   * summary; that box has to grow too. Where the pseudo-element is unknown
+   * the source keeps its minimum height.
+   */
+  .js-more[open],
+  .js-more[open]::details-content { display: flex; flex-direction: column; }
+  .js-more[open]::details-content { flex: 1 0 auto; }
+  .js-more summary {
+    width: max-content;
+    font-size: 10.5px;
+    color: var(--ink-mute);
+    cursor: pointer;
+    /* A toggle, not text: a quick double-click should not select the word. */
+    user-select: none;
+  }
+  .js-more summary:hover { color: var(--ink); }
+  .js-more[open] summary { margin-bottom: 4px; }
+  .js-note { margin: 8px 0 0; font-size: 11px; line-height: 1.5; color: var(--ink-mute); }
+
+  /* ---------- scale ladder ---------- */
+
+  /*
+   * One grid for the whole ladder, its rows on a subgrid, so the names
+   * column is as wide as the widest name in every row and each ruler ends
+   * at the same place. Sized per row, they ended wherever that row's name did.
+   */
+  .scale {
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr) auto 28px;
+    gap: 2px 8px;
+    margin: 4px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .scale-row {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: subgrid;
+    align-items: center;
+    min-height: 18px;
+  }
+  .scale-value {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--ink);
+    text-align: right;
+    white-space: nowrap;
+  }
+  .scale-count {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    color: var(--ink-mute);
+    text-align: right;
+  }
+  .scale-sample {
+    font-family: var(--sans);
+    line-height: 1.15;
+    color: var(--ink-soft);
+    white-space: nowrap;
     overflow: hidden;
   }
-  /* Neutral: a conformance figure is a reading, and accent means "changed". */
-  .meter > span { display: block; height: 100%; border-radius: 2px; background: var(--ink-soft); }
+  /*
+   * The ruler: a hairline at every base unit, at the bars' own doubled
+   * scale, so a value on the scale ends exactly on one.
+   */
+  .scale-track {
+    position: relative;
+    height: 10px;
+    overflow: hidden;
+    border-radius: 2px;
+    background: repeating-linear-gradient(
+      90deg,
+      var(--rule) 0 1px,
+      transparent 1px var(--scale-tick, 8px)
+    );
+  }
+  /* Neutral: a reading, not a change. Only the values off the grid take the accent. */
+  .scale-bar {
+    display: block;
+    max-width: 100%;
+    height: 100%;
+    border-radius: 2px;
+    background: var(--ink-soft);
+  }
+  .scale-row[data-off='true'] .scale-value { color: var(--accent); }
+  .scale-row[data-off='true'] .scale-bar,
+  .scale-legend .scale-key { background: var(--accent); }
+  .scale-row[data-off='true'] .scale-sample { color: var(--accent); }
+  .scale-legend {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 6px 0 0;
+    font-size: 11px;
+    color: var(--ink-mute);
+  }
+  .scale-key { width: 10px; height: 8px; border-radius: 2px; }
+
+  /*
+   * The variable names, each its own copy button. Capped so a long name
+   * cannot squeeze the bar out of its row; the full name is in the title.
+   */
+  .scale-vars { display: flex; gap: 2px; max-width: 150px; min-width: 0; }
+  .scale-vars .copy {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--ink-soft);
+    background: var(--bg-sunk);
+  }
+  .scale-vars .copy:hover { color: var(--ink); }
+  /* The Export tab's names are suggestions, not the page's: a quieter ink, and the legend says so. */
+  .scale-vars[data-from='export'] .copy,
+  .scale-key-name { color: var(--ink-mute); }
+  .scale-key-name { font-family: var(--mono); font-size: 10px; }
+
+  /* Read out, not shown: what color alone would otherwise have to say. */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /*
+   * A code block is the point of the view it is in — Markup, Export, a
+   * stylesheet's source — so it takes whatever height the panel has left
+   * rather than stopping at a fixed one: its group grows into the body, and
+   * the block grows inside its group. Past that it scrolls on its own. The
+   * minimums keep it usable when the content above it is tall.
+   */
+  .body > .group:has(> pre),
+  .body > .group:has(> .code-block),
+  .body > .group:has(.svg-tool) { flex: 1 1 0; min-height: 180px; }
+
+  /* ---------- svg tool ---------- */
+
+  .svg-tool { display: flex; flex-direction: column; gap: 6px; flex: 1 1 0; min-height: 0; }
+  .svg-size {
+    margin: 0;
+    font-size: 11px;
+    color: var(--ink-mute);
+    font-variant-numeric: tabular-nums;
+  }
+  /* A checkerboard behind the preview, so transparent parts read as transparent. */
+  .svg-preview {
+    display: block;
+    height: 140px;
+    padding: 8px;
+    border-radius: 6px;
+    background: repeating-conic-gradient(var(--bg-sunk) 0 25%, var(--bg-raised) 0 50%) 0 0 / 12px 12px;
+  }
+  /*
+   * Sized to the box, not to the image: an SVG with only a viewBox has no
+   * size of its own. The box is a block of fixed height so that 100% has
+   * something definite to resolve against; in a grid row sized by its
+   * content it fell back to the image's ratio and overflowed.
+   */
+  .svg-preview img { display: block; width: 100%; height: 100%; object-fit: contain; }
+  .svg-input {
+    width: 100%;
+    min-height: 120px;
+    resize: vertical;
+    padding: 8px 10px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    line-height: 1.5;
+    color: var(--ink);
+    background: var(--bg-sunk);
+    border: 1px solid var(--rule-strong);
+    border-radius: 6px;
+    /* Wrapped like the code blocks; set here, not left to each engine's defaults. */
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .svg-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  /* Under an asset row: a bounded block, since the list goes on below it. */
+  .asset-svg { padding: 4px 0 10px; }
+  .asset-svg .svg-tool pre { flex: none; max-height: 240px; }
+  /* As tall as its code there, so the buttons in its corner sit at the code's end. */
+  .asset-svg .svg-tool .code-block { flex: none; min-height: 0; }
 
   pre {
+    flex: 1 1 0;
+    min-height: 120px;
     margin: 0;
     padding: 8px 10px;
     background: var(--bg-sunk);
@@ -1418,13 +2001,57 @@ export const PANEL_STYLES = `
     font-size: 10.5px;
     line-height: 1.55;
     color: var(--ink-soft);
-    overflow-x: auto;
-    max-height: 260px;
-    overflow-y: auto;
-    white-space: pre;
+    overflow: auto;
+    /*
+     * Wrapped, so a long line reads without scrolling sideways in a narrow
+     * panel. "anywhere" rather than "break-word": minified markup and path
+     * data are one unbroken run, and only "anywhere" also lets the block's
+     * own width shrink to the panel instead of the run stretching it.
+     */
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
   }
 
-  pre + .empty { margin-top: 4px; }
+  pre + .empty,
+  .code-block + .empty { margin-top: 4px; }
+
+  /*
+   * Prism's token types, folded into a few colors. Nested tokens carry their
+   * own class, so an attribute inside a tag or a quote inside a string takes
+   * its own color rather than the one around it.
+   */
+  .tok-comment, .tok-prolog, .tok-doctype, .tok-cdata,
+  .tok-punctuation, .tok-operator { color: var(--ink-mute); }
+  .tok-tag, .tok-keyword, .tok-atrule, .tok-rule, .tok-important { color: var(--syn-keyword); }
+  .tok-attr-name, .tok-property, .tok-function { color: var(--syn-name); }
+  .tok-string, .tok-attr-value, .tok-url, .tok-template-string, .tok-regex,
+  .tok-char { color: var(--syn-string); }
+  .tok-number, .tok-boolean, .tok-null, .tok-constant, .tok-entity { color: var(--syn-number); }
+  .tok-selector, .tok-class-name, .tok-variable { color: var(--syn-selector); }
+
+  /*
+   * A block with its buttons in the top-right corner. The block keeps clear
+   * of them on the right, so no wrapped line runs underneath: wider where
+   * there are two, as in the SVG tool.
+   */
+  .code-block {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 120px;
+  }
+  .code-block pre { padding-right: 32px; }
+  .code-block:has(.code-actions > :nth-child(2)) pre { padding-right: 54px; }
+  .code-actions {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    display: flex;
+    gap: 2px;
+  }
+  .code-actions .copy { background: var(--bg-sunk); }
+  .code-actions .copy:hover { background: var(--bg-raised); }
 
   .export-actions { display: flex; flex-wrap: wrap; gap: 4px; }
 
